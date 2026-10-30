@@ -5,6 +5,7 @@ import urllib3
 import os
 import ipaddress
 import socket
+import re
 
 # 全局禁用 HTTPS 证书验证警告
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
