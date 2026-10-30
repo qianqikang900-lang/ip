@@ -36,7 +36,10 @@ jobs:
       - name: Commit and push results
        uses: stefanzweifel/git-auto-commit-action@v5
        with:
-         commit_message: "chore: update all ip files [auto]"
+         commit_message: "chore: update ip files [auto]"
          file_pattern: "*.txt"
          commit_user_name: GitHub Action
          commit_user_email: action@github.com
+         # 【新增这两行配置，解决分支落后/冲突无法推送的问题】
+         skip_fetch: false
+         push_options: '--force'
