@@ -2,7 +2,8 @@ import requests
 import re
 import os
 import time
-import ipaddressimport socket
+import ipaddress
+import socket
 import concurrent.futures
 import urllib3
 
