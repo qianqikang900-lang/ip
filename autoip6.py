@@ -80,7 +80,7 @@ def get_country_code(ip):
         print(f"查询IP {ip} country_code失败: {e}")
         return 'ZZ'
         
-def test_ip_speed(ip_port_str, timeout=3):
+def test_ip_speed(ip_port_str, timeout=10):
     """
     通用测速函数：支持 IPv4 和 IPv6，自带防错与超时保护
     """
@@ -165,7 +165,7 @@ if unique_ipv4:
     results_v4 = []
     for ip in sorted_ipv4:
         country_code = get_country_code(ip)
-        results_v4.append(f"{ip}:8443#{country_code}")
+        results_v4.append(f"{ip}:443#{country_code}")
         time.sleep(1)
     with open('ip.txt', 'w', encoding='utf-8') as file:
         for line in results_v4:
@@ -179,7 +179,7 @@ if 'unique_ipv6' in globals() and unique_ipv6:
     results_v6 = []
     for ip in sorted_ipv6:
         country_code = get_country_code(ip)
-        results_v6.append(f"[{ip}]:8443#{country_code}-IPV6")
+        results_v6.append(f"[{ip}]:443#{country_code}-IPV6")
         time.sleep(1)
     
     with open('ipv6.txt', 'w', encoding='utf-8') as file:
