@@ -12,7 +12,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # 目标URL列表
 urls = [
-    'https://raw.githubusercontent.com/ahang39/router/refs/heads/main/all.txt',
+    'https://raw.githubusercontent.com/Xiaobei09/proxyip/refs/heads/main/data/valid/all_ltd.txt',
     
 ]
 #    'https://cf.090227.xyz', 
