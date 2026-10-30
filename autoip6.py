@@ -2,7 +2,12 @@ import requests
 import re
 import os
 import time
-import ipaddress
+import ipaddressimport socket
+import concurrent.futures
+import urllib3
+
+# 1. 全局禁用 urllib3 的 HTTPS 证书验证警告，防止测速时满屏爆黄字警告
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # 目标URL列表
 urls = [
@@ -84,6 +89,154 @@ def get_country_code(ip):
     except Exception as e:
         print(f"查询IP {ip} country_code失败: {e}")
         return 'ZZ'
+        
+ def test_ip_speed(ip_port_str, timeout=3):
+    """
+    通用测速函数：支持 IPv4 和 IPv6，自带防错与超时保护
+    """
+    try:
+        raw_line = str(ip_port_str).strip()
+        if not raw_line or raw_line.startswith('#'):
+            return None
+            
+        # 1. 智能解析 IPv6 带端口格式：[ip]:port
+        if ']' in raw_line:
+            parts = raw_line.split(']')
+            ip = parts[0].strip('[')
+            port = int(parts[1].lstrip(':')) if len(parts) > 1 and ':' in parts[1] else 443
+            url_prefix = f"https://[{ip}]:{port}"
+        # 2. 智能解析 IPv4 带端口格式：ip:port
+        elif raw_line.count(':') == 1:
+            ip, port_str = raw_line.split(':')
+            ip = ip.strip()
+            port = int(port_str.strip())
+            url_prefix = f"https://{ip}:{port}"
+        else:
+            ip = raw_line.strip('[]')
+            port = 443
+            url_prefix = f"https://{ip}:{port}"
+    except Exception:
+        return None
+
+    # Cloudflare 标准测速包路径
+    test_url = f"{url_prefix}/__down?bytes=1048576" 
+    
+    start_time = time.time()
+    try:
+        # 使用 verify=False 忽略直连 IP 的证书不匹配问题
+        response = requests.get(test_url, timeout=timeout, verify=False, stream=True)
+        if response.status_code == 200:
+            downloaded_bytes = 0
+            for chunk in response.iter_content(chunk_size=8192):
+                if chunk:
+                    downloaded_bytes += len(chunk)
+                    # 收到 512KB 即可提前结束以加快整体测速速度
+                    if downloaded_bytes >= 512 * 1024:
+                        break
+            
+            elapsed_time = time.time() - start_time
+            if elapsed_time > 0:
+                speed_kbps = (downloaded_bytes / 1024) / elapsed_time
+                return {
+                    "ip": ip, 
+                    "port": port, 
+                    "speed": round(speed_kbps, 2), 
+                    "raw": ip_port_str
+                }
+    except Exception:
+        pass
+    
+    return None
+
+def get_country_code(ip):
+    """
+    获取 IP 对应的国家代码（带超时和异常保护）
+    """
+    try:
+        response = requests.get(f"http://ip-api.com/json/{ip}?fields=countryCode", timeout=2)
+        if response.status_code == 200:
+            return response.json().get("countryCode", "US")
+    except Exception:
+        pass
+    return "US"
+    
+# --- 主执行逻辑 ---
+if __name__ == "__main__":
+    # 确保变量存在，防止 NameError
+    unique_ipv4 = globals().get('unique_ipv4', [])
+    
+    if unique_ipv4:
+        print(f"开始对收集到的 {len(unique_ipv4)} 个 IPv4 地址进行并发测速...")
+        
+        tested_results = []
+        # 使用多线程并发测速（最大并发数 50）
+        with concurrent.futures.ThreadPoolExecutor(max_workers=50) as executor:
+            future_to_ip = {executor.submit(test_ip_latency, item, 1.5): item for item in unique_ipv4}
+            for future in concurrent.futures.as_completed(future_to_ip):
+                res = future.result()
+                if res is not None:
+                    tested_results.append(res)
+
+        if tested_results:
+            # 1. 按照延迟从小到大升序排序
+            sorted_results = sorted(tested_results, key=lambda x: x['latency'])
+            
+            # 2. 取最快的前 50 个
+            top_50 = sorted_results[:50]
+            
+            # 3. 组装结果
+            results_best = []
+            for item in top_50:
+                ip = item['ip']
+                port = item['port']
+                latency = item['latency']
+                country_code = get_country_code(ip)
+                
+                results_best.append(f"{ip}:{port}#{country_code}-{latency}ms")
+            
+            # 4. 写入 bestip.txt 文件
+            with open('bestip.txt', 'w', encoding='utf-8') as file:
+                for line in results_best:
+                    file.write(line + '\n')
+                    
+            print(f'测速完成！已成功将延迟最低的前 {len(results_best)} 个优质 IPv4 写入 bestip.txt。')
+        else:
+            with open('bestip.txt', 'w', encoding='utf-8') as file:
+                file.write("# No responsive IPv4 addresses found\n")
+            print('所有 IPv4 测速节点均不可用，已生成空的 bestip.txt。')
+    else:
+        with open('bestip.txt', 'w', encoding='utf-8') as file:
+            file.write("# No IPv4 addresses found\n")
+        print('未找到可用于测速的 IPv4 列表。')
+    # 使用 Cloudflare 的标准测速路径（下载 1MB 测试包）
+    test_url = f"{url_prefix}/__down?bytes=1048576" 
+    
+    start_time = time.time()
+    try:
+        # 【关键修改】加入 verify=False，解决直连 IP 时的 SSL 证书域名不匹配报错
+        response = requests.get(test_url, timeout=timeout, verify=False, stream=True)
+        if response.status_code == 200:
+            downloaded_bytes = 0
+            for chunk in response.iter_content(chunk_size=8192):
+                if chunk:
+                    downloaded_bytes += len(chunk)
+                    # 收到 512KB 数据即可提前结束，提升整体测速效率
+                    if downloaded_bytes >= 512 * 1024:
+                        break
+            
+            elapsed_time = time.time() - start_time
+            if elapsed_time > 0:
+                speed_kbps = (downloaded_bytes / 1024) / elapsed_time
+                return {
+                    "ip": ip, 
+                    "port": port, 
+                    "speed": round(speed_kbps, 2), 
+                    "raw": ip_port_str
+                }
+    except Exception:
+        pass
+    
+    return None       
 
 if unique_ipv4:
     sorted_ipv4 = sorted(unique_ipv4, key=lambda ip: [int(part) for part in ip.split('.')])
@@ -117,24 +270,79 @@ else:
         file.write("# No valid IPv6 addresses found\n")
     print('未找到有效的IPv6地址，已强制生成空的 ipv6.txt 以防提交报错。')
     
-if unique_ipv4:
-    # 转换为列表并排序（这里采用您原有的排序逻辑，或者您可以根据需要调整排序规则）
-    all_sorted_v4 = sorted(unique_ipv4, key=lambda ip: [int(part) for part in ip.split('.')])
+if __name__ == "__main__":
+    # 1. 安全读取 ip.txt 和 ipv6.txt（加入文件存在性检查，防止 FileNotFoundError 崩溃）
+    all_targets = []
     
-    # 截取前 50 个最好的（如果总数不足 50 个则取全部）
-    top_50_v4 = all_sorted_v4[:50]
-    
-    results_top50 = []
-    for ip in top_50_v4:
-        # 复用前面的国家代码查询函数
-        country_code = get_country_code(ip)
-        results_top50.append(f"{ip}:8443，443，2053,2083#{country_code}")
-        time.sleep(1)
-        
-    with open('bestip.txt', 'w', encoding='utf-8') as file:
-        for line in results_top50:
-            file.write(line + '\n')
+    for filename in ['ip.txt', 'ipv6.txt']:
+        if os.path.exists(filename):
+            print(f"正在读取文件: {filename}")
+            try:
+                with open(filename, 'r', encoding='utf-8') as f:
+                    for line in f:
+                        line = line.strip()
+                        # 清洗脏数据：过滤空行和注释行
+                        if line and not line.startswith('#'):
+                            all_targets.append(line)
+            except Exception as e:
+                print(f"读取文件 {filename} 时出现异常: {e}")
+        else:
+            print(f"提示: 未找到文件 {filename}（可能未生成），已自动跳过。")
+
+    # 列表去重
+    all_targets = list(set(all_targets))
+    print(f"合并去重后共发现 {len(all_targets)} 个待测速节点，开始多线程并发测速...")
+
+    if all_targets:
+        tested_results = []
+        # 2. 多线程并发测速（控制最大并发 30，平衡速度与稳定性）
+        with concurrent.futures.ThreadPoolExecutor(max_workers=30) as executor:
+            future_to_ip = {executor.submit(test_ip_speed, item, 3): item for item in all_targets}
+            for future in concurrent.futures.as_completed(future_to_ip):
+                try:
+                    res = future.result()
+                    if res is not None:
+                        tested_results.append(res)
+                except Exception:
+                    pass
+
+        if tested_results:
+            # 3. 按照下载速度从大到小【降序排序】（速度数值越大、网速越快的排在最前面）
+            sorted_results = sorted(tested_results, key=lambda x: x['speed'], reverse=True)
             
-    print(f'已成功优选出最好的 {len(results_top50)} 个IPv4地址保存到 bestip.txt 文件。')
-else:
-    print('没有可用于优选的IPv4地址。')
+            # 4. 严选出速度最快的前 50 个（不足 50 个则取全部）
+            top_50 = sorted_results[:50]
+            
+            # 5. 组装格式并写入 bestip.txt
+            results_best = []
+            for item in top_50:
+                ip = item['ip']
+                port = item['port']
+                speed = item['speed']
+                
+                # 获取国家代码
+                country_code = get_country_code(ip)
+                
+                # 智能识别：IPv6 加上中括号 [ip]:port，IPv4 保持 ip:port
+                if ':' in ip:
+                    results_best.append(f"[{ip}]:{port}#{country_code}-{speed}KB/s")
+                else:
+                    results_best.append(f"{ip}:{port}#{country_code}-{speed}KB/s")
+            
+            # 写入 bestip.txt 文件
+            with open('bestip.txt', 'w', encoding='utf-8') as file:
+                for line in results_best:
+                    file.write(line + '\n')
+                    
+            print(f'✅ 测速筛选完成！已成功将双文件里速度最快的前 {len(results_best)} 个优质 IP 写入 bestip.txt。')
+        else:
+            # 如果全部测速失败，写入占位符防止 GitHub Actions 提交时报错
+            with open('bestip.txt', 'w', encoding='utf-8') as file:
+                file.write("# No high-speed IPs found\n")
+            print('⚠️ 所有节点的测速均未通过，已生成空的 bestip.txt。')
+    else:
+        # 如果双文件均为空，也写一个占位符保证工作流不中断
+        with open('bestip.txt', 'w', encoding='utf-8') as file:
+            file.write("# No IP addresses found in source files\n")
+        print('❌ ip.txt 和 ipv6.txt 中均未找到可用的 IP 节点，已生成空的 bestip.txt。')
+        
