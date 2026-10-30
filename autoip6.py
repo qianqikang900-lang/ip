@@ -81,9 +81,10 @@ def get_country_code(ip):
     return "ZZ"
 
 
-def process_entry(entry, default_port=8443, timeout=2):
-    """通用解析、测速与查归属地函数"""
+def process_entry(entry, default_port=443, timeout=2):
+    """通用解析、测速与查归属地函数（支持动态端口解析）"""
     try:
+        # 1. 兼容带方括号的 IPv6 (如 [2400::1]:8443) 和普通 IPv4 (如 1.2.3.4:443)
         if entry.startswith('['):
             parts = entry.split(']')
             ip = parts[0].replace('[', '')
@@ -93,12 +94,13 @@ def process_entry(entry, default_port=8443, timeout=2):
             ip = parts[0]
             remainder = ':'.join(parts[1:]) if len(parts) > 1 else ''
 
+        # 2. 提取端口：如果链接或文本中自带了端口号则使用自带的，否则使用默认端口
         port = default_port
         port_match = re.search(r':(\d+)', remainder)
         if port_match:
             port = int(port_match.group(1))
 
-        # TCP 连通性测试
+        # 3. TCP 连通性测试（使用解析出来的实际端口）
         start_time = time.time()
         addr_info = socket.getaddrinfo(ip, port, socket.AF_UNSPEC, socket.SOCK_STREAM)
         
@@ -116,12 +118,12 @@ def process_entry(entry, default_port=8443, timeout=2):
                 s.close()
                 continue
         
+        # 4. 连通成功后查询归属地，并把真实的端口拼接并写入文件
         if connected:
             country = get_country_code(ip)
-            # 保持原有的输出格式规范（支持 IPv6 带方括号）
-            if ":" in ip:  # IPv6
+            if ":" in ip:  # IPv6 格式
                 return f"[{ip}]:{port}#{country}"
-            else:          # IPv4
+            else:          # IPv4 格式
                 return f"{ip}:{port}#{country}"
     except Exception:
         pass
