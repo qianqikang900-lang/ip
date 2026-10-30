@@ -119,8 +119,8 @@ def test_ip_speed(ip_port_str, timeout=3):
     except Exception:
         return None
 
-    # Cloudflare 标准测速包路径
-    test_url = f"{url_prefix}/__down?bytes=1048576" 
+ # 动态拼接：使用当前正在遍历的 ip_port 对应的 url_prefix，加上测速路径
+    test_url = f"{url_prefix}/__down?bytes=512000"
     
     start_time = time.time()
     try:
