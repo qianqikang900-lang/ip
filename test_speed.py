@@ -13,20 +13,51 @@ OUTPUT_FILE = "fast_ip.txt"
 # 测速专用的 URL
 SPEED_TEST_URL = "https://speed.cloudflare.com/__down?bytes=1000000"
 
-# 修改 test_single_ip 的默认超时时间，提高容错
 def test_single_ip(line, timeout=5):
+    """测试单个 IP 节点的 TCP 延迟与实际下载速度"""
     line = line.strip()
     if not line:
         return None
-    try:
-        # ... (中间的解析和 TCP 测试代码保持不变) ...
         
+    try:
+        # 分离出 IP、端口和国家代码备注 (例如: 1.2.3.4:443#TH)
+        if "#" in line:
+            ip_port_part, country_tag = line.rsplit("#", 1)
+        else:
+            ip_port_part = line
+            
+        # 兼容 IPv6 方括号与 IPv4 端口解析
+        if ip_port_part.startswith("["):
+            parts = ip_port_part.split("]")
+            ip = parts[0].replace("[", "")
+            port = int(parts[1].replace(":", ""))
+        else:
+            ip, port_str = ip_port_part.rsplit(":", 1)
+            port = int(port_str)
+            
+        # 1. 先进行 TCP 连通性测试（快速排除死IP）
+        start_time = time.time()
+        addr_info = socket.getaddrinfo(ip, port, socket.AF_UNSPEC, socket.SOCK_STREAM)
+        connected = False
+        for res in addr_info:
+            af, socktype, proto, _, sa = res
+            s = socket.socket(af, socktype, proto)
+            s.settimeout(timeout)
+            try:
+                s.connect(sa)
+                connected = True
+                s.close()
+                break
+            except Exception:
+                s.close()
+                continue
+                
         if not connected:
             return None
             
-        latency = int((time.time() - start_time) * 1000)
+        latency = int((time.time() - start_time) * 1000)  # TCP 延迟 (ms)
         
-        # 即使下载测速失败，也先返回延迟，确保有节点可用
+        # 2. 进阶：通过真实下载测速获取网速
         speed_kbps = 0.0
         try:
             ctx = ssl.create_default_context()
@@ -42,15 +73,14 @@ def test_single_ip(line, timeout=5):
                     chunk = response.read(150 * 1024)
                     dl_time = time.time() - dl_start
                     if dl_time > 0 and len(chunk) > 0:
-                        speed_kbps = (len(chunk) / 1024) / dl_time
-        except Exception as e:
-            # 打印单个节点的下载测速异常（可选，方便排查）
-            # print(f"节点 {line} 下载测速跳过: {e}")
+                        speed_bytes_per_sec = len(chunk) / dl_time
+                        speed_kbps = speed_bytes_per_sec / 1024
+        except Exception:
             pass
             
         return latency, speed_kbps, line
-    except Exception as e:
-        # print(f"节点 {line} 解析异常: {e}")
+        
+    except Exception:
         return None
 
 def main():
