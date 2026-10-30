@@ -81,12 +81,12 @@ def main():
 
     print(f"\n测速完成！有效可用节点共 {len(results)} 个。")
     print("-" * 45)
-    print(f"{ '延迟 (ms)':<12 } | 节点详情")
+    print(f"{'延迟 (ms)':<12} | 节点详情")
     print("-" * 45)
     
     # 打印前 15 个最快节点的预览
     for latency, line in results[:15]:
-        print(f"{str(latency) + ' ms':<12 } | {line}")
+        print(f"{str(latency) + ' ms':<12} | {line}")
     if len(results) > 15:
         print(f"... 还有 {len(results) - 15} 个节点未展示")
 
