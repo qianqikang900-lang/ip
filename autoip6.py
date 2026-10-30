@@ -81,8 +81,8 @@ def get_country_code(ip):
     return "ZZ"
 
 
-def process_entry(entry, default_port=443, timeout=2):
-    """通用解析、测速与查归属地函数（支持动态端口解析）"""
+def process_entry(entry, timeout=2):
+    """通用解析、测速与查归属地函数：严格保留源数据自带的端口"""
     try:
         # 1. 兼容带方括号的 IPv6 (如 [2400::1]:8443) 和普通 IPv4 (如 1.2.3.4:443)
         if entry.startswith('['):
@@ -94,13 +94,14 @@ def process_entry(entry, default_port=443, timeout=2):
             ip = parts[0]
             remainder = ':'.join(parts[1:]) if len(parts) > 1 else ''
 
-        # 2. 提取端口：如果链接或文本中自带了端口号则使用自带的，否则使用默认端口
-        port = default_port
+        # 2. 提取源数据中自带的端口
+        # 如果源数据本身没有写端口，可以给一个默认兜底；如果写了，则严格使用源数据的端口
+        port = 443  # 基础兜底端口（仅当源数据完全没写端口时生效）
         port_match = re.search(r':(\d+)', remainder)
         if port_match:
             port = int(port_match.group(1))
 
-        # 3. TCP 连通性测试（使用解析出来的实际端口）
+        # 3. 使用提取出来的真实端口进行 TCP 连通性测试
         start_time = time.time()
         addr_info = socket.getaddrinfo(ip, port, socket.AF_UNSPEC, socket.SOCK_STREAM)
         
@@ -118,7 +119,7 @@ def process_entry(entry, default_port=443, timeout=2):
                 s.close()
                 continue
         
-        # 4. 连通成功后查询归属地，并把真实的端口拼接并写入文件
+        # 4. 连通成功后，使用源数据的真实端口拼接并返回
         if connected:
             country = get_country_code(ip)
             if ":" in ip:  # IPv6 格式
@@ -135,7 +136,7 @@ if unique_ipv4_entries:
     print("正在并发测试 IPv4 连通性及获取归属地...")
     # 如果你想把默认端口改为 443，可以在这里传入 default_port=443
     with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
-        futures = [executor.submit(process_entry, entry, default_port=443) for entry in unique_ipv4_entries]
+        futures = [executor.submit(process_entry, entry) for entry in unique_ipv4_entries]
         for future in concurrent.futures.as_completed(futures):
             res = future.result()
             if res:
@@ -155,7 +156,7 @@ valid_ipv6_results = []
 if unique_ipv6_entries:
     print("正在并发测试 IPv6 连通性及获取归属地...")
     with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
-        futures = [executor.submit(process_entry, entry, default_port=443) for entry in unique_ipv6_entries]
+        futures = [executor.submit(process_entry, entry) for entry in unique_ipv6_entries]
         for future in concurrent.futures.as_completed(futures):
             res = future.result()
             if res:
