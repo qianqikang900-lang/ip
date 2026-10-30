@@ -108,8 +108,13 @@ def test_ip_speed(ip_port_str, timeout=3):
     except Exception:
         return None
 
-# 1. 动态拼接当前测速 IP 的路径（利用前面解析出来的 url_prefix）
-test_url = f"{url_prefix}/__down?bytes=524288"  # 测速包大小设为 500KB 左右
+# 确保在拼接 test_url 之前，已经定义了 ip 和 port 并生成了 url_prefix
+ip = raw_line.strip('[]')  # 假设这是从文件读取并处理后的 IP
+port = 443                 # 你的端口（如 443）
+url_prefix = f"https://{ip}:{port}"  # 必须先有这一句，定义 url_prefix
+
+# 之后再进行拼接测速
+test_url = f"{url_prefix}/__down?bytes=524288"
 
 start_time = time.time()
 try:
