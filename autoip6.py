@@ -166,9 +166,11 @@ if unique_ipv6_entries:
 else:
     # 即使没有 IPv6，也创建一个空文件，防止 git 提交时报错找不到文件
     open('ipv6.txt', 'w', encoding='utf-8').close()
-    
-  import subprocess
-import sys
+
+
+# ==================== 结尾：自动调用测速脚本 ====================
+import subprocess
+sys.modules # 确保环境正常
 
 def run_speed_test():
     if not os.path.exists("test_speed.py"):
@@ -180,11 +182,10 @@ def run_speed_test():
     print("=" * 40)
     
     try:
-        # 确保缓冲区的内的数据完全写入磁盘
+        # 确保缓冲区的数据完全写入磁盘
         sys.stdout.flush()
         
         # 使用当前解释器运行 test_speed.py
-        # 实时输出日志（不捕获 stdout/stderr，让其直接打印到 GitHub Actions 控制台）
         result = subprocess.run(
             [sys.executable, "test_speed.py"], 
             check=True
@@ -193,15 +194,15 @@ def run_speed_test():
         
     except subprocess.CalledProcessError as e:
         print(f"\n[错误] 测速脚本执行失败，退出码: {e.returncode}")
-        # 将测速的错误码向上传递给 GitHub Actions，使流水线标红报错
         sys.exit(e.returncode)
     except Exception as ex:
         print(f"\n[异常] 启动测速脚本时发生未知错误: {ex}")
         sys.exit(1)
 
+# 主程序结束前直接进行落盘等待并调用测速
 if __name__ == "__main__":
-    # 可以在这里加一个短暂的延时，确保前面写入的 ip.txt / ipv6.txt 完全落盘
-    time.sleep(1)
+    time.sleep(1)  # 确保前面的 ip.txt / ipv6.txt 完全写入磁盘
+    run_speed_test()
     
     # 执行测速
     run_speed_test()
