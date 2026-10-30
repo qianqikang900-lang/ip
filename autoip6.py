@@ -13,18 +13,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 # 目标URL列表
 urls = [
     'https://raw.githubusercontent.com/ahang39/router/refs/heads/main/all.txt',
-    'https://raw.githubusercontent.com/joname1/BestCFip/refs/heads/main/ipv4.txt',
-    'https://raw.githubusercontent.com/Xiaobei09/proxyip/refs/heads/main/data/valid/all_ltd.txt',
-    'https://raw.githubusercontent.com/cmliu/WorkerVless2sub/refs/heads/main/addressesapi.txt',
-    'https://bestcf.pages.dev/s5gy/jp.txt',
-    'https://addressesapi.090227.xyz/ip.164746.xyz',
-    'https://cf.junzhen.qzz.io/best_ips.txt',
-    'https://raw.githubusercontent.com/love-ztm/cfip/refs/heads/main/ubest_ips.txt',
-    'https://bestcf.pages.dev/tiancheng/jp.txt',
-    'https://bestcf.pages.dev/lzj/all.txt',
-    'https://bestcf.pages.dev/uouin/all.txt',
-    'https://bestcf.pages.dev/ircf/ipv4.txt',
-    'https://bestcf.pages.dev/random-region/JP/50.txt'
+    
 ]
 #    'https://cf.090227.xyz', 
 #    'https://stock.hostmonit.com/CloudFlareYes',
