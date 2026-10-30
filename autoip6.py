@@ -6,13 +6,19 @@ import ipaddress
 
 # 目标URL列表
 urls = [
-    'https://ip.164746.xyz', 
-    'https://api.uouin.com/cloudflare.html',
-    'https://ipdb.api.030101.xyz/?type=bestcf&country=true',
-    'https://addressesapi.090227.xyz/CloudFlareYes',
-    'https://raw.githubusercontent.com/ymyuuu/IPDB/main/BestCF/bestcfv4.txt',
-    'https://www.wetest.vip/page/cloudflare/address_v6.html',
-    'https://www.wetest.vip/page/cloudflare/address_v4.html'
+    https://raw.githubusercontent.com/ahang39/router/refs/heads/main/all.txt',
+    'https://raw.githubusercontent.com/joname1/BestCFip/refs/heads/main/ipv4.txt',
+    'https://raw.githubusercontent.com/Xiaobei09/proxyip/refs/heads/main/data/valid/all_ltd.txt',
+    'https://raw.githubusercontent.com/cmliu/WorkerVless2sub/refs/heads/main/addressesapi.txt',
+    'https://bestcf.pages.dev/s5gy/jp.txt',
+    'https://addressesapi.090227.xyz/ip.164746.xyz',
+    'https://cf.junzhen.qzz.io/best_ips.txt',
+    'https://raw.githubusercontent.com/love-ztm/cfip/refs/heads/main/ubest_ips.txt',
+    'https://bestcf.pages.dev/tiancheng/jp.txt',
+    'https://bestcf.pages.dev/lzj/all.txt',
+    'https://bestcf.pages.dev/uouin/all.txt',
+    'https://bestcf.pages.dev/ircf/ipv4.txt',
+    'https://bestcf.pages.dev/random-region/JP/50.txt'
 ]
 #    'https://cf.090227.xyz', 
 #    'https://stock.hostmonit.com/CloudFlareYes',
