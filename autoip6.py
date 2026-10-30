@@ -129,13 +129,13 @@ def process_entry(entry, default_port=443, timeout=2):
         pass
     return None
 
-
 # 使用线程池并发处理 IPv4 测速
 valid_ipv4_results = []
 if unique_ipv4_entries:
     print("正在并发测试 IPv4 连通性及获取归属地...")
+    # 如果你想把默认端口改为 443，可以在这里传入 default_port=443
     with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
-        futures = [executor.submit(process_entry, entry) for entry in unique_ipv4_entries]
+        futures = [executor.submit(process_entry, entry, default_port=443) for entry in unique_ipv4_entries]
         for future in concurrent.futures.as_completed(futures):
             res = future.result()
             if res:
@@ -145,6 +145,9 @@ if unique_ipv4_entries:
         for line in sorted(valid_ipv4_results):
             f.write(line + '\n')
     print(f"IPv4 处理完毕，有效节点已写入 ip.txt，共 {len(valid_ipv4_results)} 个。")
+else:
+    # 即使没有有效的 IPv4 节点，也创建一个空文件，防止 git 提交时报错找不到文件
+    open('ip.txt', 'w', encoding='utf-8').close()
 
 
 # 使用线程池并发处理 IPv6 测速
@@ -152,7 +155,7 @@ valid_ipv6_results = []
 if unique_ipv6_entries:
     print("正在并发测试 IPv6 连通性及获取归属地...")
     with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
-        futures = [executor.submit(process_entry, entry) for entry in unique_ipv6_entries]
+        futures = [executor.submit(process_entry, entry, default_port=443) for entry in unique_ipv6_entries]
         for future in concurrent.futures.as_completed(futures):
             res = future.result()
             if res:
@@ -162,4 +165,7 @@ if unique_ipv6_entries:
         for line in sorted(valid_ipv6_results):
             f.write(line + '\n')
     print(f"IPv6 处理完毕，有效节点已写入 ipv6.txt，共 {len(valid_ipv6_results)} 个。")
+else:
+    # 即使没有 IPv6，也创建一个空文件，防止 git 提交时报错找不到文件
+    open('ipv6.txt', 'w', encoding='utf-8').close()
     
