@@ -112,6 +112,7 @@ if unique_ipv6:
     print(f'已保存 {len(results_v6)} 个唯一IPv6地址及country_code到ipv6.txt文件。')
 else:
     print('未找到有效的IPv6地址。')
+    
 # --- 新增：提取最好的 50 个 IPv4 保存到 bestip.txt ---
 if unique_ipv4:
     # 转换为列表并排序（这里采用您原有的排序逻辑，或者您可以根据需要调整排序规则）
