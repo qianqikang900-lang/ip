@@ -92,17 +92,21 @@ def main():
     with open(INPUT_FILE, "r", encoding="utf-8") as f:
         lines = f.readlines()
         
-    print(f"成功加载 {INPUT_FILE}，共有 {len(lines)} 个节点，正在多线程并发测速中...")
+    # 【新增优化】去除空白行以及完全相同的重复 IP 节点，避免重复测速
+    lines = list(dict.fromkeys([line.strip() for line in lines if line.strip()]))
+        
+    print(f"成功加载 {INPUT_FILE}，去重后共有 {len(lines)} 个有效节点，正在多线程并发测速中...")
     results = []
     
-    # 使用线程池并发测试（max_workers 可根据机器性能调整）
-    with concurrent.futures.ThreadPoolExecutor(max_workers=25) as executor:
+    # 将线程数从 25 提高到 50，加快并发测速（可根据需要调整）
+    with concurrent.futures.ThreadPoolExecutor(max_workers=50) as executor:
         futures = {executor.submit(test_single_ip, line): line for line in lines}
         for future in concurrent.futures.as_completed(futures):
             res = future.result()
             if res:
                 results.append(res)  # 格式: (latency, speed_kbps, original_line)
-
+                
+    # 后续的排序、预览和写入逻辑保持不变...
     # 【可选优化】如果你只想保留下载速度大于 0 的有效测速节点：
     # results = [res for res in results if res[1] > 0]
 
