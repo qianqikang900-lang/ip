@@ -205,5 +205,3 @@ if __name__ == "__main__":
     time.sleep(1)  # 确保前面的 ip.txt / ipv6.txt 完全写入磁盘
     run_speed_test()
     
-    # 执行测速
-    run_speed_test()
