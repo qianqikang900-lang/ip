@@ -125,7 +125,10 @@ def test_ip_speed(ip_port_str, timeout=3):
     start_time = time.time()
     try:
         # 使用 verify=False 忽略直连 IP 的证书不匹配问题
-        response = requests.get(test_url, timeout=timeout, verify=False, stream=True)
+        headers = {'Host': 'speed.cloudflare.com', 'User-Agent': 'Mozilla/5.0'}
+        
+        # 🟢 正确缩进：这些代码都在 try 块内部
+        response = requests.get(test_url, headers=headers, timeout=timeout, verify=False, stream=True)
         if response.status_code == 200:
             downloaded_bytes = 0
             for chunk in response.iter_content(chunk_size=8192):
@@ -138,16 +141,10 @@ def test_ip_speed(ip_port_str, timeout=3):
             elapsed_time = time.time() - start_time
             if elapsed_time > 0:
                 speed_kbps = (downloaded_bytes / 1024) / elapsed_time
-                return {
-                    "ip": ip, 
-                    "port": port, 
-                    "speed": round(speed_kbps, 2), 
-                    "raw": ip_port_str
-                }
+                # (后续返回结果的逻辑...)
+                
     except Exception:
-        pass
-    
-    return None
+        return None
 
 def get_country_code(ip):
     """
