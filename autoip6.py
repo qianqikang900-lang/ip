@@ -90,7 +90,7 @@ if unique_ipv4:
     results_v4 = []
     for ip in sorted_ipv4:
         country_code = get_country_code(ip)
-        results_v4.append(f"{ip}:8443#{country_code}")
+        results_v4.append(f"{ip}:8443，443，2053,2083#{country_code}")
         time.sleep(1)
     with open('ip.txt', 'w', encoding='utf-8') as file:
         for line in results_v4:
@@ -104,7 +104,7 @@ if 'unique_ipv6' in globals() and unique_ipv6:
     results_v6 = []
     for ip in sorted_ipv6:
         country_code = get_country_code(ip)
-        results_v6.append(f"[{ip}]:8443#{country_code}-IPV6")
+        results_v6.append(f"[{ip}]:8443，443，2053,2083#{country_code}-IPV6")
         time.sleep(1)
     
     with open('ipv6.txt', 'w', encoding='utf-8') as file:
@@ -128,7 +128,7 @@ if unique_ipv4:
     for ip in top_50_v4:
         # 复用前面的国家代码查询函数
         country_code = get_country_code(ip)
-        results_top50.append(f"{ip}:8443#{country_code}")
+        results_top50.append(f"{ip}:8443，443，2053,2083#{country_code}")
         time.sleep(1)
         
     with open('bestip.txt', 'w', encoding='utf-8') as file:
