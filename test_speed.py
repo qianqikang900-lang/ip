@@ -33,7 +33,6 @@ def test_single_ip(line, timeout=2):
 
         # 开始进行 TCP 连通性与延迟测试
         start_time = time.time()
-        # 获取地址信息
         addr_info = socket.getaddrinfo(ip, port, socket.AF_UNSPEC, socket.SOCK_STREAM)
         
         connected = False
@@ -53,10 +52,8 @@ def test_single_ip(line, timeout=2):
             return latency, line
             
     except (ValueError, TypeError):
-        # 针对解析配置错误的行进行静默忽略
         pass
-    except Exception as e:
-        # 其他非致命异常可在此处理（如果需要排查可打印 e）
+    except Exception:
         pass
         
     return None
@@ -67,7 +64,6 @@ def main():
         return
 
     with open(INPUT_FILE, "r", encoding="utf-8") as f:
-        # 过滤掉空行和纯注释行，去重
         lines = list(set([line.strip() for line in f if line.strip() and not line.strip().startswith("#")]))
 
     if not lines:
@@ -77,7 +73,6 @@ def main():
     print(f"成功加载 {INPUT_FILE}，共有 {len(lines)} 个有效节点，正在多线程并发测速...")
 
     results = []
-    # 使用线程池并发测试（max_workers 可根据需要调整，建议 50-100 以加快速度）
     max_workers = min(50, len(lines)) if len(lines) > 0 else 30
     
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -87,31 +82,31 @@ def main():
             try:
                 res = future.result()
                 if res:
-                    results.append(res)  # 格式: (latency, original_line)
+                    results.append(res)
             except Exception:
                 pass
 
     # 按照延迟从小到大排序（延迟越低速度越快）
     results.sort(key=lambda x: x[0])
 
-    print(f"\n测速完成！有效可用节点共 {len(results)} 个。")
+    # 截取最优的前 50 个 IP（如果总数不足 50 个则取全部）
+    top_results = results[:50]
+
+    print(f"\n测速完成！有效可用节点共 {len(results)} 个，已为您选取最优的 {len(top_results)} 个节点。")
     print("-" * 45)
     print(f"{'延迟 (ms)':<12} | 节点详情")
     print("-" * 45)
 
-    # 打印前 15 个最快节点的预览
-    for latency, line in results[:15]:
+    # 打印最优节点的预览
+    for latency, line in top_results:
         print(f"{str(latency) + ' ms':<12} | {line}")
 
-    if len(results) > 15:
-        print(f"... 还有 {len(results) - 15} 个节点未展示")
-
-    # 将所有测速通过的节点按速度排序后保存到输出文件
+    # 将最优的 50 个节点按速度排序后保存到输出文件
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
-        for latency, line in results:
+        for latency, line in top_results:
             f.write(f"{line}\n")
 
-    print(f"\n所有可用节点已按延迟从快到慢保存至: {OUTPUT_FILE}")
+    print(f"\n最优的 {len(top_results)} 个节点已按延迟从快到慢保存至: {OUTPUT_FILE}")
 
 if __name__ == "__main__":
     main()
