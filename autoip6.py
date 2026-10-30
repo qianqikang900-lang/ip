@@ -1,13 +1,12 @@
-import requests
-import re
-import os
 import time
-import ipaddress
-import socket
+import requests
 import concurrent.futures
 import urllib3
+import os
+import ipaddress
+import socket
 
-# 1. 全局禁用 urllib3 的 HTTPS 证书验证警告，防止测速时满屏爆黄字警告
+# 全局禁用 HTTPS 证书验证警告
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # 目标URL列表
@@ -91,7 +90,7 @@ def get_country_code(ip):
         print(f"查询IP {ip} country_code失败: {e}")
         return 'ZZ'
         
- def test_ip_speed(ip_port_str, timeout=3):
+def test_ip_speed(ip_port_str, timeout=3):
     """
     通用测速函数：支持 IPv4 和 IPv6，自带防错与超时保护
     """
@@ -272,75 +271,81 @@ else:
     print('未找到有效的IPv6地址，已强制生成空的 ipv6.txt 以防提交报错。')
     
 if __name__ == "__main__":
-    # 1. 安全读取 ip.txt 和 ipv6.txt（指定 encoding='utf-8' 防乱码/报错）
-    all_targets = []
-    for filename in ['ip.txt', 'ipv6.txt']:
-        if os.path.exists(filename):
-            print(f"正在读取文件: {filename}")
-            try:
-                with open(filename, 'r', encoding='utf-8') as f:
-                    for line in f:
-                        line = line.strip()
-                        # 清洗脏数据：过滤空行和注释行
-                        if line and not line.startswith('#'):
-                            all_targets.append(line)
-            except Exception as e:
-                print(f"读取文件 {filename} 时出现异常: {e}")
-        else:
-            print(f"提示: 未找到文件 {filename}（可能未生成），已自动跳过。")
-
-    # 列表去重
-    all_targets = list(set(all_targets))
-    print(f"合并去重后共发现 {len(all_targets)} 个待测速节点，开始多线程并发测速...")
-
-    if all_targets:
-        tested_results = []
-        # 2. 多线程并发测速（控制最大并发 30，平衡速度与稳定性）
-        with concurrent.futures.ThreadPoolExecutor(max_workers=30) as executor:
-            future_to_ip = {executor.submit(test_ip_speed, item, 3): item for item in all_targets}
-            for future in concurrent.futures.as_completed(future_to_ip):
+    try:
+        # 1. 安全读取 ip.txt 和 ipv6.txt（指定 encoding='utf-8' 防乱码/报错）
+        all_targets = []
+        for filename in ['ip.txt', 'ipv6.txt']:
+            if os.path.exists(filename):
+                print(f"正在读取文件: {filename}")
                 try:
-                    res = future.result()
-                    if res is not None:
-                        tested_results.append(res)
-                except Exception:
-                    pass
+                    with open(filename, 'r', encoding='utf-8') as f:
+                        for line in f:
+                            line = line.strip()
+                            # 清洗脏数据：过滤空行和注释行
+                            if line and not line.startswith('#'):
+                                all_targets.append(line)
+                except Exception as e:
+                    print(f"读取文件 {filename} 时出现异常: {e}")
+            else:
+                print(f"提示: 未找到文件 {filename}（可能未生成），已自动跳过。")
 
-        if tested_results:
-            # 3. 按照下载速度从大到小【降序排序】（速度最快的排在最前面）
-            sorted_results = sorted(tested_results, key=lambda x: x['speed'], reverse=True)
-            
-            # 4. 只对最终入选的前 50 个最优 IP 查询国家代码，避免触发 API 限流
-            top_50 = sorted_results[:50]
-            print(f"测速完成！正在获取前 {len(top_50)} 个最优节点的国家归属地...")
-            
-            results_best = []
-            for item in top_50:
-                ip = item['ip']
-                port = item['port']
-                speed = item['speed']
+        # 列表去重
+        all_targets = list(set(all_targets))
+        print(f"合并去重后共发现 {len(all_targets)} 个待测速节点，开始多线程并发测速...")
+
+        if all_targets:
+            tested_results = []
+            # 2. 多线程并发测速（控制最大并发 30，平衡速度与稳定性）
+            with concurrent.futures.ThreadPoolExecutor(max_workers=30) as executor:
+                future_to_ip = {executor.submit(test_ip_speed, item, 3): item for item in all_targets}
+                for future in concurrent.futures.as_completed(future_to_ip):
+                    try:
+                        res = future.result()
+                        if res is not None:
+                            tested_results.append(res)
+                    except Exception:
+                        pass
+
+            if tested_results:
+                # 3. 按照下载速度从大到小【降序排序】（速度最快的排在最前面）
+                sorted_results = sorted(tested_results, key=lambda x: x['speed'], reverse=True)
                 
-                country_code = get_country_code(ip)
-                time.sleep(0.1) # 稍微缓一口气，防止请求过快
+                # 4. 只对最终入选的前 50 个最优 IP 查询国家代码，避免触发 API 限流
+                top_50 = sorted_results[:50]
+                print(f"测速完成！正在获取前 {len(top_50)} 个最优节点的国家归属地...")
                 
-                # 智能识别：IPv6 加上中括号 [ip]:port，IPv4 保持 ip:port
-                if ':' in ip:
-                    results_best.append(f"[{ip}]:{port}#{country_code}-{speed}KB/s")
-                else:
-                    results_best.append(f"{ip}:{port}#{country_code}-{speed}KB/s")
-            
-            # 5. 安全写入 bestip.txt 文件
-            with open('bestip.txt', 'w', encoding='utf-8') as file:
-                for line in results_best:
-                    file.write(line + '\n')
+                results_best = []
+                for item in top_50:
+                    ip = item['ip']
+                    port = item['port']
+                    speed = item['speed']
                     
-            print(f'✅ 筛选完成！已成功将双文件里速度最快的前 {len(results_best)} 个优质 IP 写入 bestip.txt。')
+                    country_code = get_country_code(ip)
+                    time.sleep(0.1) # 稍微缓一口气，防止请求过快
+                    
+                    # 智能识别：IPv6 加上中括号 [ip]:port，IPv4 保持 ip:port
+                    if ':' in ip:
+                        results_best.append(f"[{ip}]:{port}#{country_code}-{speed}KB/s")
+                    else:
+                        results_best.append(f"{ip}:{port}#{country_code}-{speed}KB/s")
+                
+                # 5. 安全写入 bestip.txt 文件
+                with open('bestip.txt', 'w', encoding='utf-8') as file:
+                    for line in results_best:
+                        file.write(line + '\n')
+                        
+                print(f'✅ 筛选完成！已成功将双文件里速度最快的前 {len(results_best)} 个优质 IP 写入 bestip.txt。')
+            else:
+                with open('bestip.txt', 'w', encoding='utf-8') as file:
+                    file.write("# No high-speed IPs found\n")
+                print('⚠️ 所有节点的测速均未通过，已生成空的 bestip.txt。')
         else:
             with open('bestip.txt', 'w', encoding='utf-8') as file:
-                file.write("# No high-speed IPs found\n")
-            print('⚠️ 所有节点的测速均未通过，已生成空的 bestip.txt。')
-    else:
+                file.write("# No IP addresses found in source files\n")
+            print('❌ 源码文件中未找到可用的 IP 节点，已生成空的 bestip.txt。')
+            
+    except Exception as e:
+        print(f"❌ 运行过程中发生未捕获的严重错误: {e}")
         with open('bestip.txt', 'w', encoding='utf-8') as file:
-            file.write("# No IP addresses found in source files\n")
-        print('❌ 源码文件中未找到可用的 IP 节点，已生成空的 bestip.txt。')
+            file.write(f"# Critical error: {e}\n")
         
