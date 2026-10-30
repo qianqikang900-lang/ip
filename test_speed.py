@@ -89,8 +89,8 @@ def main():
     # 按照延迟从小到大排序（延迟越低速度越快）
     results.sort(key=lambda x: x[0])
 
-    # 截取最优的前 50 个 IP（如果总数不足 50 个则取全部）
-    top_results = results[:50]
+    # 截取最优的前 100 个 IP（如果总数不足 100 个则取全部）
+    top_results = results[:100]
 
     print(f"\n测速完成！有效可用节点共 {len(results)} 个，已为您选取最优的 {len(top_results)} 个节点。")
     print("-" * 45)
@@ -101,12 +101,13 @@ def main():
     for latency, line in top_results:
         print(f"{str(latency) + ' ms':<12} | {line}")
 
-    # 将最优的 50 个节点按速度排序后保存到输出文件
+    # 将最优的 50 个节点按“IP - 延迟”格式保存到输出文件
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         for latency, line in top_results:
-            f.write(f"{line}\n")
+            # 格式为: 节点详情 - 延迟ms (可根据需要改成空格或其他分隔符)
+            f.write(f"{line} - {latency}ms\n")
 
-    print(f"\n最优的 {len(top_results)} 个节点已按延迟从快到慢保存至: {OUTPUT_FILE}")
+    print(f"\n最优的 {len(top_results)} 个节点（含延迟信息）已保存至: {OUTPUT_FILE}")
 
 if __name__ == "__main__":
     main()
