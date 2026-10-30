@@ -25,7 +25,7 @@ def test_single_ip(line, timeout=3):
             ip_port_part, country_tag = line.rsplit("#", 1)
         else:
             ip_port_part = line
-
+            
         # 兼容 IPv6 方括号与 IPv4 端口解析
         if ip_port_part.startswith("["):
             parts = ip_port_part.split("]")
@@ -34,11 +34,10 @@ def test_single_ip(line, timeout=3):
         else:
             ip, port_str = ip_port_part.rsplit(":", 1)
             port = int(port_str)
-
+            
         # 1. 先进行 TCP 连通性测试（快速排除死IP）
         start_time = time.time()
         addr_info = socket.getaddrinfo(ip, port, socket.AF_UNSPEC, socket.SOCK_STREAM)
-        
         connected = False
         for res in addr_info:
             af, socktype, proto, _, sa = res
@@ -52,45 +51,38 @@ def test_single_ip(line, timeout=3):
             except Exception:
                 s.close()
                 continue
-
+                
         if not connected:
             return None
-
+            
         latency = int((time.time() - start_time) * 1000)  # TCP 延迟 (ms)
-
+        
         # 2. 进阶：通过真实下载测速获取网速
         speed_kbps = 0.0
         try:
-            # 创建不校验证书的安全上下文
             ctx = ssl.create_default_context()
             ctx.check_hostname = False
             ctx.verify_mode = ssl.CERT_NONE
-            
             handler = urllib.request.HTTPSHandler(context=ctx)
             opener = urllib.request.build_opener(handler)
-            
             req = urllib.request.Request(SPEED_TEST_URL)
             
             dl_start = time.time()
             with opener.open(req, timeout=timeout) as response:
                 if response.status == 200:
-                    # 【优化】将读取量从 300KB 调整为 150KB，提高多线程测速并发响应速度
                     chunk = response.read(150 * 1024)
                     dl_time = time.time() - dl_start
-                    
                     if dl_time > 0 and len(chunk) > 0:
                         speed_bytes_per_sec = len(chunk) / dl_time
                         speed_kbps = speed_bytes_per_sec / 1024
         except Exception:
-            # 下载测速失败时优雅降级，仅保留 TCP 延迟
+            # 下载测速失败时保持 speed_kbps = 0.0
             pass
-
+            
         return latency, speed_kbps, line
-
-    except Exception:
-        pass
         
-    return None
+    except Exception:
+        return None
 
 def main():
     if not os.path.exists(INPUT_FILE):
@@ -111,8 +103,13 @@ def main():
             if res:
                 results.append(res)  # 格式: (latency, speed_kbps, original_line)
 
-    # 1. 排序规则：优先按下载速度从大到小排序，若速度为0则按延迟从小到大排序
+    # 【可选优化】如果你只想保留下载速度大于 0 的有效测速节点：
+    # results = [res for res in results if res[1] > 0]
+    
     results.sort(key=lambda x: (-x[1], x[0]))
+    
+    # 只取前 50 个
+    top_50_results = results[:50]
     
     print(f"\n测速完成！有效可用节点共 {len(results)} 个。")
     print("-" * 65)
