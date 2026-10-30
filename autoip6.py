@@ -10,6 +10,15 @@ import sys
 # 目标URL列表
 urls = [
     'https://raw.githubusercontent.com/Xiaobei09/proxyip/refs/heads/main/data/valid/all_ltd.txt'
+    'https://bestcf.pages.dev/random-region/JP/50.txt',
+    'https://raw.githubusercontent.com/ahang39/router/refs/heads/main/all.txt',
+    'https://bestcf.pages.dev/s5gy/jp.txt',
+    'https://cf.junzhen.qzz.io/best_ips.txt',
+    'https://raw.githubusercontent.com/love-ztm/cfip/refs/heads/main/ubest_ips.txt',
+    'https://bestcf.pages.dev/tiancheng2/jp.txt'，
+    'https://bestcf.pages.dev/lzj/all.txt'，
+    'https://bestcf.pages.dev/xinyitang3/ipv4.txt'，
+    'https://bestcf.pages.dev/uouin/all.txt'，
 
 ]
 #    'https://cf.090227.xyz', 
