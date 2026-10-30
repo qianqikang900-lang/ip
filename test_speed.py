@@ -110,28 +110,28 @@ def main():
     # 【可选优化】如果你只想保留下载速度大于 0 的有效测速节点：
     # results = [res for res in results if res[1] > 0]
 
-    # 1. 排序规则：优先按下载速度从大到小，若速度为0则按延迟从小到大
-    results.sort(key=lambda x: (-x[1], x[0]))
-    
+    # 1. 排序规则：纯粹按延迟从小到大排序（x[0] 代表延迟）
+    results.sort(key=lambda x: x[0])
+
     print(f"\n测速完成！有效可用节点共 {len(results)} 个。")
     print("-" * 65)
-    print(f"{'下载速度':<15} | {'延迟 (ms)':<12} | 节点详情")
+    print(f"{'延迟 (ms)':<12} | {'下载速度':<15} | 节点详情")
     print("-" * 65)
     
-    # 打印前 15 个最快节点的预览
+    # 打印前 15 个最低延迟节点的预览
     for latency, speed_kbps, line in results[:15]:
         if speed_kbps >= 1024:
             speed_str = f"{speed_kbps / 1024:.2f} MB/s"
         elif speed_kbps > 0:
             speed_str = f"{speed_kbps:.1f} KB/s"
         else:
-            speed_str = f"{latency}ms (仅延迟)"
-        print(f"{speed_str:<15} | {str(latency) + ' ms':<12} | {line}")
+            speed_str = "0 KB/s"
+        print(f"{str(latency) + ' ms':<12} | {speed_str:<15} | {line}")
 
     if len(results) > 15:
         print(f"... 还有 {len(results) - 15} 个节点未展示")
 
-    # 2. 统一在这里截取最优的前 50 个节点用于写入文件
+    # 2. 截取延迟最优的前 50 个节点用于写入文件
     top_50_results = results[:50]
 
     # 保存结果到输出文件
