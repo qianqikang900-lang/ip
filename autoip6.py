@@ -6,7 +6,7 @@ import ipaddress
 
 # 目标URL列表
 urls = [
-    https://raw.githubusercontent.com/ahang39/router/refs/heads/main/all.txt',
+    'https://raw.githubusercontent.com/ahang39/router/refs/heads/main/all.txt',
     'https://raw.githubusercontent.com/joname1/BestCFip/refs/heads/main/ipv4.txt',
     'https://raw.githubusercontent.com/Xiaobei09/proxyip/refs/heads/main/data/valid/all_ltd.txt',
     'https://raw.githubusercontent.com/cmliu/WorkerVless2sub/refs/heads/main/addressesapi.txt',
