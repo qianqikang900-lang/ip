@@ -114,9 +114,9 @@ if unique_ipv6:
                 time.sleep(1)
     print(f'已成功保存 {len(unique_ipv6)} 个IPv6地址到 ipv6.txt 文件。')
 else:
-    # 即使没有抓到 IPv6，也强制写入一个默认占位符，保证文件必然存在
-    file.write("# No valid IPv6 addresses found\n")
-    print('未找到有效的IPv6地址，已强制生成 ipv6.txt 以防提交报错。')
+   # 即使没有抓到 IPv6，也强制写入一个默认占位符，保证文件必然存在
+        file.write("# No valid IPv6 addresses found\n")
+        print('未找到有效的IPv6地址，已强制生成 ipv6.txt 以防提交报错。')
     
 # --- 新增：提取最好的 50 个 IPv4 保存到 bestip.txt ---
 if unique_ipv4:
