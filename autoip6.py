@@ -114,8 +114,8 @@ if unique_ipv6:
                 time.sleep(1)
         print(f'已成功保存 {len(unique_ipv6)} 个IPv6地址到 ipv6.txt 文件。')
 else:
-    file.write("# No valid IPv6 addresses found\n")
-    print('未找到有效的IPv6地址，已强制生成 ipv6.txt 以防提交报错。')
+        file.write("# No valid IPv6 addresses found\n")
+        print('未找到有效的IPv6地址，已强制生成 ipv6.txt 以防提交报错。')
     
 if unique_ipv4:
     # 转换为列表并排序（这里采用您原有的排序逻辑，或者您可以根据需要调整排序规则）
