@@ -5,6 +5,8 @@ import re
 import socket
 import time
 import requests
+import subprocess
+import sys
 
 # 目标URL列表
 urls = [
@@ -169,18 +171,26 @@ else:
     # 即使没有 IPv6，也创建一个空文件，防止 git 提交时报错找不到文件
     open('ipv6.txt', 'w', encoding='utf-8').close()
     
-   # 写入完成后，自动触发测速脚本
-if os.path.exists("test_speed.py"):
-    print("正在自动调用测速脚本对 ip.txt 进行延迟排序...")
-    
-    # 动态适配当前系统的 python 命令（防止 python3 环境下找不到 python 命令）
-    import sys
-    python_cmd = sys.executable  # 获取当前正在运行的 Python 解释器绝对路径
-    
-    # 执行并捕获返回值
-    exit_code = os.system(f'"{python_cmd}" test_speed.py')
-    
-    if exit_code != 0:
-        print(f"警告: test_speed.py 运行结束，但返回了非零状态码: {exit_code}")
-else:
-    print("提示: 未在当前目录下找到 test_speed.py 文件，跳过自动测速。")
+   import subprocess
+import sys
+
+def run_speed_test():
+    if not os.path.exists("test_speed.py"):
+        print("提示: 未在当前目录下找到 test_speed.py 文件，跳过自动测速。")
+        return
+
+    print("正在自动运行测速脚本 test_speed.py...")
+    try:
+        # 使用当前解释器运行 test_speed.py，并实时输出日志
+        result = subprocess.run(
+            [sys.executable, "test_speed.py"], 
+            check=True
+        )
+        print("测速脚本执行完毕。")
+    except subprocess.CalledProcessError as e:
+        print(f"错误：测速脚本执行失败，退出码: {e.returncode}")
+        sys.exit(e.returncode)
+
+if __name__ == "__main__":
+    # 执行测速
+    run_speed_test()
