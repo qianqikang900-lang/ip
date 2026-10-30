@@ -1,21 +1,13 @@
-import requests
-import re
-import os
-import time
+import concurrent.futures
 import ipaddress
+import re
+import socket
+import time
+import requests
 
 # 目标URL列表
 urls = [
-    'https://raw.githubusercontent.com/Xiaobei09/proxyip/refs/heads/main/data/valid/all_ltd.txt', 
-    'https://bestcf.pages.dev/random-region/JP/50.txt',
-    'https://raw.githubusercontent.com/ahang39/router/refs/heads/main/all.txt',
-    'https://bestcf.pages.dev/s5gy/jp.txt',
-    'https://cf.junzhen.qzz.io/best_ips.txt',
-    'https://raw.githubusercontent.com/love-ztm/cfip/refs/heads/main/ubest_ips.txt',
-    'https://bestcf.pages.dev/tiancheng2/jp.txt'，
-    'https://bestcf.pages.dev/lzj/all.txt'，
-    'https://bestcf.pages.dev/xinyitang3/ipv4.txt'，
-    'https://bestcf.pages.dev/uouin/all.txt'，
+    'https://raw.githubusercontent.com/Xiaobei09/proxyip/refs/heads/main/data/valid/all_ltd.txt'
 
 ]
 #    'https://cf.090227.xyz', 
@@ -23,90 +15,148 @@ urls = [
 #    'https://addressesapi.090227.xyz/ip.164746.xyz',
 #    'https://api.uouin.com/cloudflare.html',
 
-# 正则表达式用于初步匹配IPV4与IPV6地址（配合ipaddress库二次过滤）
-ipv4_pattern = r'\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b'
-ipv6_pattern = r'\b(?:[A-F0-9a-f]{1,4}:){1,7}[A-F0-9a-f]{1,4}\b'  # 加入小写支持
-
-# 检查ip.txt和ipv6.txt文件是否存在,如果存在则删除它
+# 检查文件是否存在并删除
 if os.path.exists('ip.txt'):
-    os.remove('ip.txt')
+  os.remove('ip.txt')
 if os.path.exists('ipv6.txt'):
-    os.remove('ipv6.txt')
+  os.remove('ipv6.txt')
 
-# 使用集合存储IP地址实现自动去重
-unique_ipv4 = set()
-unique_ipv6 = set()
+# 使用集合去重（存储原始的整行或 "ip:port" 结构）
+unique_ipv4_entries = set()
+unique_ipv6_entries = set()
 
+# 优化的正则表达式：匹配 IP 以及后面可能自带的 :port 和 #备注
+# 兼容 IPv4 和 IPv6 (IPv6 带有方括号如 [2400::1]:8443)
+ipv4_line_pattern = r'(?:[0-9]{1,3}\.){3}[0-9]{1,3}(?::[0-9]+)?(?:#[\w-]*)?'
+ipv6_line_pattern = (r'(?:\[(?:[A-F0-9a-f]{1,4}:){1,7}[A-F0-9a-f]{1,4}\]'r'|(?:[A-F0-9a-f]{1,4}:){1,7}[A-F0-9a-f]{1,4})(?::[0-9]+)?(?:#[\w-]*)?')
+
+print("正在从各个源抓取并解析 IP 地址...")
 for url in urls:
     try:
-        # 发送HTTP请求获取网页内容
         response = requests.get(url, timeout=7)
-        
-        # 确保请求成功
         if response.status_code == 200:
-            # 获取网页的文本内容
             html_content = response.text
+            v4_matches = re.findall(ipv4_line_pattern, html_content)
+            v6_matches = re.findall(ipv6_line_pattern, html_content)
             
-            # 使用正则表达式查找IP地址
-            ipv4_matches = re.findall(ipv4_pattern, html_content)
-            ipv6_matches = re.findall(ipv6_pattern, html_content)
-            
-            # 用ipaddress校验并去重
-            for ip in ipv4_matches:
+            for entry in v4_matches:
+                ip_part = entry.split(':')[0].split('#')[0]
                 try:
-                    ipaddress.IPv4Address(ip)
-                    unique_ipv4.add(ip)
+                    ipaddress.IPv4Address(ip_part)
+                    unique_ipv4_entries.add(entry.strip())
                 except ValueError:
                     continue
-            for ip in ipv6_matches:
+                    
+            for entry in v6_matches:
+                ip_part = (
+                    entry.split(']')[0]
+                    .replace('[', '')
+                    .split(':')[0]
+                    .split('#')[0]
+                )
                 try:
-                    # 粗略过滤后进一步用ipaddress校验
-                    ip_obj = ipaddress.IPv6Address(ip)
-                    unique_ipv6.add(ip.lower())
+                    ipaddress.IPv6Address(ip_part)
+                    unique_ipv6_entries.add(entry.strip().lower())
                 except ValueError:
                     continue
     except requests.exceptions.RequestException as e:
         print(f'请求 {url} 失败: {e}')
         continue
 
-# 查询每个IP的country_code
+print(f"抓取完成！共收集到 {len(unique_ipv4_entries)} 个唯一 IPv4，{len(unique_ipv6_entries)} 个唯一 IPv6。")
+
+
 def get_country_code(ip):
+    """获取 IP 对应的国家代码（带简单重试）"""
+    url = f"https://api.ipinfo.io/lite/{ip}?token=6f75ff6b8f013b"
+    for _ in range(2):
+        try:
+            resp = requests.get(url, timeout=4)
+            if resp.status_code == 200:
+                data = resp.json()
+                return data.get("country_code") or data.get("country") or "ZZ"
+        except Exception:
+            time.sleep(0.2)
+    return "ZZ"
+
+
+def process_entry(entry, default_port=8443, timeout=2):
+    """通用解析、测速与查归属地函数"""
     try:
-        url = f'https://api.ipinfo.io/lite/{ip}?token=6f75ff6b8f013b'
-        resp = requests.get(url, timeout=5)
-        if resp.status_code == 200:
-            data = resp.json()
-            return data.get('country_code') or data.get('country') or 'ZZ'
+        if entry.startswith('['):
+            parts = entry.split(']')
+            ip = parts[0].replace('[', '')
+            remainder = parts[1]
         else:
-            return 'ZZ'
-    except Exception as e:
-        print(f"查询IP {ip} country_code失败: {e}")
-        return 'ZZ'
+            parts = entry.split(':')
+            ip = parts[0]
+            remainder = ':'.join(parts[1:]) if len(parts) > 1 else ''
 
-if unique_ipv4:
-    sorted_ipv4 = sorted(unique_ipv4, key=lambda ip: [int(part) for part in ip.split('.')])
-    results_v4 = []
-    for ip in sorted_ipv4:
-        country_code = get_country_code(ip)
-        results_v4.append(f"{ip}:8443#{country_code}")
-        time.sleep(1)
-    with open('ip.txt', 'w', encoding='utf-8') as file:
-        for line in results_v4:
-            file.write(line + '\n')
-    print(f'已保存 {len(results_v4)} 个唯一IPv4地址及country_code到ip.txt文件。')
-else:
-    print('未找到有效的IPv4地址。')
+        port = default_port
+        port_match = re.search(r':(\d+)', remainder)
+        if port_match:
+            port = int(port_match.group(1))
 
-if unique_ipv6:
-    sorted_ipv6 = sorted(unique_ipv6)
-    results_v6 = []
-    for ip in sorted_ipv6:
-        country_code = get_country_code(ip)
-        results_v6.append(f"[{ip}]:8443#{country_code}-IPV6")
-        time.sleep(1)
-    with open('ipv6.txt', 'w', encoding='utf-8') as file:
-        for line in results_v6:
-            file.write(line + '\n')
-    print(f'已保存 {len(results_v6)} 个唯一IPv6地址及country_code到ipv6.txt文件。')
-else:
-    print('未找到有效的IPv6地址。')
+        # TCP 连通性测试
+        start_time = time.time()
+        addr_info = socket.getaddrinfo(ip, port, socket.AF_UNSPEC, socket.SOCK_STREAM)
+        
+        connected = False
+        for res in addr_info:
+            af, socktype, proto, _, sa = res
+            s = socket.socket(af, socktype, proto)
+            s.settimeout(timeout)
+            try:
+                s.connect(sa)
+                connected = True
+                s.close()
+                break
+            except socket.error:
+                s.close()
+                continue
+        
+        if connected:
+            country = get_country_code(ip)
+            # 保持原有的输出格式规范（支持 IPv6 带方括号）
+            if ":" in ip:  # IPv6
+                return f"[{ip}]:{port}#{country}"
+            else:          # IPv4
+                return f"{ip}:{port}#{country}"
+    except Exception:
+        pass
+    return None
+
+
+# 使用线程池并发处理 IPv4 测速
+valid_ipv4_results = []
+if unique_ipv4_entries:
+    print("正在并发测试 IPv4 连通性及获取归属地...")
+    with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+        futures = [executor.submit(process_entry, entry) for entry in unique_ipv4_entries]
+        for future in concurrent.futures.as_completed(futures):
+            res = future.result()
+            if res:
+                valid_ipv4_results.append(res)
+
+    with open('ip.txt', 'w', encoding='utf-8') as f:
+        for line in sorted(valid_ipv4_results):
+            f.write(line + '\n')
+    print(f"IPv4 处理完毕，有效节点已写入 ip.txt，共 {len(valid_ipv4_results)} 个。")
+
+
+# 使用线程池并发处理 IPv6 测速
+valid_ipv6_results = []
+if unique_ipv6_entries:
+    print("正在并发测试 IPv6 连通性及获取归属地...")
+    with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+        futures = [executor.submit(process_entry, entry) for entry in unique_ipv6_entries]
+        for future in concurrent.futures.as_completed(futures):
+            res = future.result()
+            if res:
+                valid_ipv6_results.append(res)
+
+    with open('ipv6.txt', 'w', encoding='utf-8') as f:
+        for line in sorted(valid_ipv6_results):
+            f.write(line + '\n')
+    print(f"IPv6 处理完毕，有效节点已写入 ipv6.txt，共 {len(valid_ipv6_results)} 个。")
+    
