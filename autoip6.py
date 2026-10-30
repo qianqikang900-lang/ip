@@ -5,6 +5,7 @@ import re
 import socket
 import time
 import requests
+import sys
 
 # 目标URL列表
 urls = [
