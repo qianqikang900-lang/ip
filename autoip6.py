@@ -66,7 +66,6 @@ for url in urls:
 
 print(f"抓取完成！共收集到 {len(unique_ipv4_entries)} 个唯一 IPv4，{len(unique_ipv6_entries)} 个唯一 IPv6。")
 
-
 def get_country_code(ip):
     """获取 IP 对应的国家代码（带简单重试）"""
     url = f"https://api.ipinfo.io/lite/{ip}?token=6f75ff6b8f013b"
@@ -79,7 +78,6 @@ def get_country_code(ip):
         except Exception:
             time.sleep(0.2)
     return "ZZ"
-
 
 def process_entry(entry, timeout=2):
     """通用解析、测速与查归属地函数：严格保留源数据自带的端口"""
