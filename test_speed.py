@@ -105,11 +105,9 @@ def main():
 
     # 【可选优化】如果你只想保留下载速度大于 0 的有效测速节点：
     # results = [res for res in results if res[1] > 0]
-    
+
+    # 1. 排序规则：优先按下载速度从大到小，若速度为0则按延迟从小到大
     results.sort(key=lambda x: (-x[1], x[0]))
-    
-    # 只取前 50 个
-    top_50_results = results[:50]
     
     print(f"\n测速完成！有效可用节点共 {len(results)} 个。")
     print("-" * 65)
@@ -129,7 +127,7 @@ def main():
     if len(results) > 15:
         print(f"... 还有 {len(results) - 15} 个节点未展示")
 
-    # 2. 【核心修改】只截取最优的前 50 个节点
+    # 2. 统一在这里截取最优的前 50 个节点用于写入文件
     top_50_results = results[:50]
 
     # 保存结果到输出文件
@@ -149,6 +147,6 @@ def main():
                     new_line = f"{line}#{speed_tag}"
                 f.write(f"{new_line}\n")
                 
-        print(f"\n已成功将最优的前 {len(top_50_results)} 个节点保存至: {OUTPUT_FILE}")
+        print(f"\n已成功将最优的前 {len(top_50_results)} 个节点保存至: [fast_ip.txt](https://github.com/qianqikang900-lang/ip/blob/main/fast_ip.txt)")
     except IOError as e:
         print(f"错误: 无法写入文件 {OUTPUT_FILE}！原因: {e}")
