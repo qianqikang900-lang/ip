@@ -71,16 +71,11 @@ def test_single_ip(line, timeout=3):
             
             req = urllib.request.Request(SPEED_TEST_URL)
             
-            # 【优化】如果您的节点支持直接通过 IP 访问或指定 Host，可在此处微调请求头
-            # 例如：req.add_header("Host", "speed.cloudflare.com")
-            
             dl_start = time.time()
-            # 移除全局 setdefaulttimeout，直接依靠 opener.open 的 timeout 参数（线程安全）
             with opener.open(req, timeout=timeout) as response:
-                # 校验 HTTP 状态码是否正常 (200 表示成功)
                 if response.status == 200:
-                    # 读取前 300KB 数据计算速度
-                    chunk = response.read(300 * 1024)
+                    # 【优化】将读取量从 300KB 调整为 150KB，提高多线程测速并发响应速度
+                    chunk = response.read(150 * 1024)
                     dl_time = time.time() - dl_start
                     
                     if dl_time > 0 and len(chunk) > 0:
@@ -108,8 +103,8 @@ def main():
     print(f"成功加载 {INPUT_FILE}，共有 {len(lines)} 个节点，正在多线程并发测速中...")
 
     results = []
-    # 使用线程池并发测试
-    with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+    # 使用线程池并发测试（max_workers 可根据机器性能调整）
+    with concurrent.futures.ThreadPoolExecutor(max_workers=25) as executor:
         futures = {executor.submit(test_single_ip, line): line for line in lines}
         
         for future in concurrent.futures.as_completed(futures):
