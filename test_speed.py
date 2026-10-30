@@ -61,23 +61,26 @@ def main():
     if not os.path.exists(INPUT_FILE):
         print(f"错误: 未找到 {INPUT_FILE} 文件！请先运行 autoip6.py 生成节点。")
         return
-
+        
     with open(INPUT_FILE, "r", encoding="utf-8") as f:
         lines = f.readlines()
-
-    print(f"成功加载 {INPUT_FILE}，共有 {len(lines)} 个节点，正在多线程并发测速...")
-
-    results = []
-    # 使用线程池并发测试（max_workers 可根据需要调整）
+        
+    print(f"成功加载 {INPUT_FILE} ，共有 {len(lines)} 个节点，正在多线程并发测速...")
+    
+    # 【关键修复】在这里提前初始化 results 列表，确保全局/局部作用域绝对有定义
+    results = [] 
+    
     with concurrent.futures.ThreadPoolExecutor(max_workers=30) as executor:
         futures = {executor.submit(test_single_ip, line): line for line in lines}
         for future in concurrent.futures.as_completed(futures):
             res = future.result()
             if res:
                 results.append(res)  # 格式: (latency, original_line)
-
-    # 按照延迟从小到大排序（延迟越低速度越快）
+                
+    # 按照延迟从小到大排序
     results.sort(key=lambda x: x[0])
+    
+    # 后续的打印和写入文件逻辑...
 
     print(f"\n测速完成！有效可用节点共 {len(results)} 个。")
     print("-" * 45)
@@ -90,15 +93,17 @@ def main():
     if len(results) > 15:
         print(f"... 还有 {len(results) - 15} 个节点未展示")
 
-   # 将所有测速通过的节点按速度排序后保存到输出文件（只取前 50 个最快的节点）
-with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
-    for latency, line in results[:100]:
-        # 如果原行本来就有 # 备注，可以在后面追加延迟，或者自定义格式
-        if "#" in line:
-            new_line = f"{line} ({latency}ms)"
-        else:
-            new_line = f"{line} # {latency}ms"
-        f.write(f"{new_line}\n")
+    # 如果 results 未定义或为空，给它一个空列表兜底，避免报错
+    results = globals().get('results', [])
+
+    with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
+    # 只取前 50 个或前 100 个最优节点
+        for latency, line in results[:50]:
+            if "#" in line:
+                new_line = f"{line} ({latency}ms)"
+            else:
+                new_line = f"{line} # {latency}ms"
+            f.write(f"{new_line}\n")
             
     print(f"\n所有可用节点已按延迟从快到慢保存至: {OUTPUT_FILE}")
 
