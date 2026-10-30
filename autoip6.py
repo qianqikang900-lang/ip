@@ -105,55 +105,47 @@ def test_ip_speed(ip_port_str, timeout=3):
             ip = raw_line.strip('[]')
             port = 443
             url_prefix = f"https://{ip}:{port}"
-    except Exception:
-        return None
-
-# 确保在拼接 test_url 之前，已经定义了 ip 和 port 并生成了 url_prefix
-ip = raw_line.strip('[]')  # 假设这是从文件读取并处理后的 IP
-port = 443                 # 你的端口（如 443）
-url_prefix = f"https://{ip}:{port}"  # 必须先有这一句，定义 url_prefix
-
-# 之后再进行拼接测速
-test_url = f"{url_prefix}/__down?bytes=524288"
-
-start_time = time.time()
-try:
-    # 2. 必须保留正确的目标域名 Host 头（Cloudflare 节点需要它来识别分发）
-    headers = {
-        'Host': 'speed.cloudflare.com', 
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
-    }
-    
-    # 3. 使用 verify=False 忽略直连 IP 证书不匹配问题，设置合理的 timeout（如 3-5 秒）
-    response = requests.get(
-        test_url, 
-        headers=headers, 
-        timeout=5, 
-        verify=False, 
-        stream=True
-    )
-    
-    if response.status_code == 200:
-        downloaded_bytes = 0
-        for chunk in response.iter_content(chunk_size=8192):
-            if chunk:
-                downloaded_bytes += len(chunk)
-                # 收到 512KB 数据即可提前跳出，计算平均速度
-                if downloaded_bytes >= 512 * 1024:
-                    break
-        
-        elapsed_time = time.time() - start_time
-        if elapsed_time > 0:
-            # 计算速度 (KB/s)
-            speed_kbps = (downloaded_bytes / 1024) / elapsed_time
-            # 后续将测速成功的 ip 和 speed 写入结果或判定为有效节点
-            print(f"IP {ip} 测速成功，速度: {speed_kbps:.2f} KB/s")
             
-except Exception as e:
-    # 捕获超时或连接错误，不让单个坏节点中断整个脚本
-    # print(f"IP {ip} 测速失败: {e}")
-    pass
-
+        # 1. 动态拼接测速路径
+        test_url = f"{url_prefix}/__down?bytes=524288"
+        
+        start_time = time.time()
+        # 2. 必须保留正确的目标域名 Host 头（Cloudflare 节点需要它来识别分发）
+        headers = {
+            'Host': 'speed.cloudflare.com', 
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+        }
+        
+        # 3. 使用 verify=False 忽略直连 IP 证书不匹配问题
+        response = requests.get(test_url, headers=headers, timeout=timeout, verify=False, stream=True)
+        
+        if response.status_code == 200:
+            downloaded_bytes = 0
+            for chunk in response.iter_content(chunk_size=8192):
+                if chunk:
+                    downloaded_bytes += len(chunk)
+                    # 收到 512KB 数据即可提前跳出，计算平均速度
+                    if downloaded_bytes >= 512 * 1024:
+                        break
+            
+            elapsed_time = time.time() - start_time
+            if elapsed_time > 0:
+                # 计算速度 (KB/s)
+                speed_kbps = (downloaded_bytes / 1024) / elapsed_time
+                print(f"IP {ip}:{port} 测速成功，速度: {speed_kbps:.2f} KB/s")
+                
+                # 【关键修复】必须返回结果字典，供主程序排序和写入 bestip.txt
+                return {
+                    'ip': ip,
+                    'port': port,
+                    'speed': speed_kbps
+                }
+    except Exception as e:
+        # 单个节点测速失败不影响其他节点
+        pass
+    
+    return None
+    
 def get_country_code(ip):
     """
     获取 IP 对应的国家代码
@@ -161,10 +153,12 @@ def get_country_code(ip):
     try:
         response = requests.get(f"http://ip-api.com/json/{ip}?fields=countryCode", timeout=2)
         if response.status_code == 200:
-            return response.json().get("countryCode", "US")
+            # 如果接口查到了国家代码就返回它，没查到则默认返回 "wu"
+            return response.json().get("countryCode", "wu")
     except Exception:
         pass
-    return "US"
+    # 当网络请求异常或超时时，默认返回 "wu"
+    return "wu"
     
 if unique_ipv4:
     sorted_ipv4 = sorted(unique_ipv4, key=lambda ip: [int(part) for part in ip.split('.')])
