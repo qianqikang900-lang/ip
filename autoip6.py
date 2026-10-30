@@ -107,11 +107,16 @@ if unique_ipv6:
         results_v6.append(f"[{ip}]:8443#{country_code}-IPV6")
         time.sleep(1)
     with open('ipv6.txt', 'w', encoding='utf-8') as file:
-        for line in results_v6:
-            file.write(line + '\n')
-    print(f'已保存 {len(results_v6)} 个唯一IPv6地址及country_code到ipv6.txt文件。')
-else:
-    print('未找到有效的IPv6地址。')
+    if unique_ipv6:
+        for ip in unique_ipv6:
+            country_code = get_country_code(ip)
+            file.write(f"[{ip}]:8443#{country_code}\n")
+            time.sleep(1)
+        print(f'已成功保存 {len(unique_ipv6)} 个IPv6地址到 ipv6.txt 文件。')
+    else:
+        # 如果没有抓到有效 IPv6，写入一行注释或保持空白，确保文件一定会被创建
+        file.write("# No valid IPv6 addresses found in this run\n")
+        print('未找到有效的IPv6地址，已生成空的 ipv6.txt 以防报错。')
     
 # --- 新增：提取最好的 50 个 IPv4 保存到 bestip.txt ---
 if unique_ipv4:
