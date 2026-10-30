@@ -91,14 +91,14 @@ def main():
         print(f"... 还有 {len(results) - 15} 个节点未展示")
 
    # 将所有测速通过的节点按速度排序后保存到输出文件
-with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
-    for latency, line in results:
+   with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
+        for latency, line in results:
         # 如果原行本来就有 # 备注，可以在后面追加延迟，或者自定义格式
-        if "#" in line:
+            if "#" in line:
             new_line = f"{line} ({latency}ms)"
-        else:
+            else:
             new_line = f"{line} # {latency}ms"
-        f.write(f"{new_line}\n")
+            f.write(f"{new_line}\n")
             
     print(f"\n所有可用节点已按延迟从快到慢保存至: {OUTPUT_FILE}")
 
