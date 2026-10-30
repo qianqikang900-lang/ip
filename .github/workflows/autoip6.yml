@@ -34,9 +34,9 @@ jobs:
         run: python autoip6.py
 
       - name: Commit and push results
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: "chore: update ip.txt and ipv6.txt [auto]"
-          file_pattern: ip.txt ipv6.txt fast_ip.txt
-          commit_user_name: GitHub Action
-          commit_user_email: action@github.com
+       uses: stefanzweifel/git-auto-commit-action@v5
+       with:
+         commit_message: "chore: update all ip files [auto]"
+         file_pattern: "*.txt"
+         commit_user_name: GitHub Action
+         commit_user_email: action@github.com
