@@ -108,32 +108,46 @@ def test_ip_speed(ip_port_str, timeout=3):
     except Exception:
         return None
 
- # 动态拼接：使用当前正在遍历的 ip_port 对应的 url_prefix，加上测速路径
-    test_url = f"{url_prefix}/__down?bytes=512000"
+# 1. 动态拼接当前测速 IP 的路径（利用前面解析出来的 url_prefix）
+test_url = f"{url_prefix}/__down?bytes=524288"  # 测速包大小设为 500KB 左右
+
+start_time = time.time()
+try:
+    # 2. 必须保留正确的目标域名 Host 头（Cloudflare 节点需要它来识别分发）
+    headers = {
+        'Host': 'speed.cloudflare.com', 
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+    }
     
-    start_time = time.time()
-    try:
-        # 使用 verify=False 忽略直连 IP 的证书不匹配问题
-        headers = {'Host': 'speed.cloudflare.com', 'User-Agent': 'Mozilla/5.0'}
+    # 3. 使用 verify=False 忽略直连 IP 证书不匹配问题，设置合理的 timeout（如 3-5 秒）
+    response = requests.get(
+        test_url, 
+        headers=headers, 
+        timeout=5, 
+        verify=False, 
+        stream=True
+    )
+    
+    if response.status_code == 200:
+        downloaded_bytes = 0
+        for chunk in response.iter_content(chunk_size=8192):
+            if chunk:
+                downloaded_bytes += len(chunk)
+                # 收到 512KB 数据即可提前跳出，计算平均速度
+                if downloaded_bytes >= 512 * 1024:
+                    break
         
-        # 🟢 正确缩进：这些代码都在 try 块内部
-        response = requests.get(test_url, headers=headers, timeout=timeout, verify=False, stream=True)
-        if response.status_code == 200:
-            downloaded_bytes = 0
-            for chunk in response.iter_content(chunk_size=8192):
-                if chunk:
-                    downloaded_bytes += len(chunk)
-                    # 收到 512KB 即可提前结束以加快整体测速速度
-                    if downloaded_bytes >= 512 * 1024:
-                        break
+        elapsed_time = time.time() - start_time
+        if elapsed_time > 0:
+            # 计算速度 (KB/s)
+            speed_kbps = (downloaded_bytes / 1024) / elapsed_time
+            # 后续将测速成功的 ip 和 speed 写入结果或判定为有效节点
+            print(f"IP {ip} 测速成功，速度: {speed_kbps:.2f} KB/s")
             
-            elapsed_time = time.time() - start_time
-            if elapsed_time > 0:
-                speed_kbps = (downloaded_bytes / 1024) / elapsed_time
-                # (后续返回结果的逻辑...)
-                
-    except Exception:
-        return None
+except Exception as e:
+    # 捕获超时或连接错误，不让单个坏节点中断整个脚本
+    # print(f"IP {ip} 测速失败: {e}")
+    pass
 
 def get_country_code(ip):
     """
