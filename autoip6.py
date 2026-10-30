@@ -168,3 +168,8 @@ if unique_ipv6_entries:
 else:
     # 即使没有 IPv6，也创建一个空文件，防止 git 提交时报错找不到文件
     open('ipv6.txt', 'w', encoding='utf-8').close()
+    
+    # 写入完成后，自动触发测速脚本
+    if os.path.exists("test_speed.py"):
+        print("正在自动调用测速脚本对 ip.txt 进行延迟排序...")
+        os.system("python test_speed.py")
