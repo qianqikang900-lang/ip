@@ -134,7 +134,6 @@ def process_entry(entry, timeout=2):
 valid_ipv4_results = []
 if unique_ipv4_entries:
     print("正在并发测试 IPv4 连通性及获取归属地...")
-    # 如果你想把默认端口改为 443，可以在这里传入 default_port=443
     with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
         futures = [executor.submit(process_entry, entry) for entry in unique_ipv4_entries]
         for future in concurrent.futures.as_completed(futures):
@@ -169,4 +168,3 @@ if unique_ipv6_entries:
 else:
     # 即使没有 IPv6，也创建一个空文件，防止 git 提交时报错找不到文件
     open('ipv6.txt', 'w', encoding='utf-8').close()
-    
