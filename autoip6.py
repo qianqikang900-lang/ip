@@ -99,13 +99,13 @@ def get_country_code(ip):
         if not raw_line or raw_line.startswith('#'):
             return None
             
-        # 1. 智能解析 IPv6 带端口格式：[ip]:port
+        # 智能解析 IPv6 带端口格式：[ip]:port
         if ']' in raw_line:
             parts = raw_line.split(']')
             ip = parts[0].strip('[')
             port = int(parts[1].lstrip(':')) if len(parts) > 1 and ':' in parts[1] else 443
             url_prefix = f"https://[{ip}]:{port}"
-        # 2. 智能解析 IPv4 带端口格式：ip:port
+        # 智能解析 IPv4 带端口格式：ip:port
         elif raw_line.count(':') == 1:
             ip, port_str = raw_line.split(':')
             ip = ip.strip()
@@ -150,7 +150,7 @@ def get_country_code(ip):
 
 def get_country_code(ip):
     """
-    获取 IP 对应的国家代码（带超时和异常保护）
+    获取 IP 对应的国家代码
     """
     try:
         response = requests.get(f"http://ip-api.com/json/{ip}?fields=countryCode", timeout=2)
@@ -271,9 +271,8 @@ else:
     print('未找到有效的IPv6地址，已强制生成空的 ipv6.txt 以防提交报错。')
     
 if __name__ == "__main__":
-    # 1. 安全读取 ip.txt 和 ipv6.txt（加入文件存在性检查，防止 FileNotFoundError 崩溃）
+    # 1. 安全读取 ip.txt 和 ipv6.txt（指定 encoding='utf-8' 防乱码/报错）
     all_targets = []
-    
     for filename in ['ip.txt', 'ipv6.txt']:
         if os.path.exists(filename):
             print(f"正在读取文件: {filename}")
@@ -307,21 +306,21 @@ if __name__ == "__main__":
                     pass
 
         if tested_results:
-            # 3. 按照下载速度从大到小【降序排序】（速度数值越大、网速越快的排在最前面）
+            # 3. 按照下载速度从大到小【降序排序】（速度最快的排在最前面）
             sorted_results = sorted(tested_results, key=lambda x: x['speed'], reverse=True)
             
-            # 4. 严选出速度最快的前 50 个（不足 50 个则取全部）
+            # 4. 只对最终入选的前 50 个最优 IP 查询国家代码，避免触发 API 限流
             top_50 = sorted_results[:50]
+            print(f"测速完成！正在获取前 {len(top_50)} 个最优节点的国家归属地...")
             
-            # 5. 组装格式并写入 bestip.txt
             results_best = []
             for item in top_50:
                 ip = item['ip']
                 port = item['port']
                 speed = item['speed']
                 
-                # 获取国家代码
                 country_code = get_country_code(ip)
+                time.sleep(0.1) # 稍微缓一口气，防止请求过快
                 
                 # 智能识别：IPv6 加上中括号 [ip]:port，IPv4 保持 ip:port
                 if ':' in ip:
@@ -329,20 +328,18 @@ if __name__ == "__main__":
                 else:
                     results_best.append(f"{ip}:{port}#{country_code}-{speed}KB/s")
             
-            # 写入 bestip.txt 文件
+            # 5. 安全写入 bestip.txt 文件
             with open('bestip.txt', 'w', encoding='utf-8') as file:
                 for line in results_best:
                     file.write(line + '\n')
                     
-            print(f'✅ 测速筛选完成！已成功将双文件里速度最快的前 {len(results_best)} 个优质 IP 写入 bestip.txt。')
+            print(f'✅ 筛选完成！已成功将双文件里速度最快的前 {len(results_best)} 个优质 IP 写入 bestip.txt。')
         else:
-            # 如果全部测速失败，写入占位符防止 GitHub Actions 提交时报错
             with open('bestip.txt', 'w', encoding='utf-8') as file:
                 file.write("# No high-speed IPs found\n")
             print('⚠️ 所有节点的测速均未通过，已生成空的 bestip.txt。')
     else:
-        # 如果双文件均为空，也写一个占位符保证工作流不中断
         with open('bestip.txt', 'w', encoding='utf-8') as file:
             file.write("# No IP addresses found in source files\n")
-        print('❌ ip.txt 和 ipv6.txt 中均未找到可用的 IP 节点，已生成空的 bestip.txt。')
+        print('❌ 源码文件中未找到可用的 IP 节点，已生成空的 bestip.txt。')
         
