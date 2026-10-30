@@ -112,3 +112,25 @@ if unique_ipv6:
     print(f'已保存 {len(results_v6)} 个唯一IPv6地址及country_code到ipv6.txt文件。')
 else:
     print('未找到有效的IPv6地址。')
+# --- 新增：提取最好的 50 个 IPv4 保存到 bestip.txt ---
+if unique_ipv4:
+    # 转换为列表并排序（这里采用您原有的排序逻辑，或者您可以根据需要调整排序规则）
+    all_sorted_v4 = sorted(unique_ipv4, key=lambda ip: [int(part) for part in ip.split('.')])
+    
+    # 截取前 50 个最好的（如果总数不足 50 个则取全部）
+    top_50_v4 = all_sorted_v4[:50]
+    
+    results_top50 = []
+    for ip in top_50_v4:
+        # 复用前面的国家代码查询函数
+        country_code = get_country_code(ip)
+        results_top50.append(f"{ip}:8443#{country_code}")
+        time.sleep(1)
+        
+    with open('bestip.txt', 'w', encoding='utf-8') as file:
+        for line in results_top50:
+            file.write(line + '\n')
+            
+    print(f'已成功优选出最好的 {len(results_top50)} 个IPv4地址保存到 bestip.txt 文件。')
+else:
+    print('没有可用于优选的IPv4地址。')
