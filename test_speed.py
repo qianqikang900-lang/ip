@@ -96,30 +96,29 @@ def main():
     if not os.path.exists(INPUT_FILE):
         print(f"错误: 未找到 {INPUT_FILE} 文件！")
         return
-
+        
     with open(INPUT_FILE, "r", encoding="utf-8") as f:
         lines = f.readlines()
-
+        
     print(f"成功加载 {INPUT_FILE}，共有 {len(lines)} 个节点，正在多线程并发测速中...")
-
     results = []
+    
     # 使用线程池并发测试（max_workers 可根据机器性能调整）
     with concurrent.futures.ThreadPoolExecutor(max_workers=25) as executor:
         futures = {executor.submit(test_single_ip, line): line for line in lines}
-        
         for future in concurrent.futures.as_completed(futures):
             res = future.result()
             if res:
                 results.append(res)  # 格式: (latency, speed_kbps, original_line)
 
-    # 排序规则：优先按下载速度从大到小排序，若速度为0则按延迟从小到大排序
+    # 1. 排序规则：优先按下载速度从大到小排序，若速度为0则按延迟从小到大排序
     results.sort(key=lambda x: (-x[1], x[0]))
-
+    
     print(f"\n测速完成！有效可用节点共 {len(results)} 个。")
     print("-" * 65)
     print(f"{'下载速度':<15} | {'延迟 (ms)':<12} | 节点详情")
     print("-" * 65)
-
+    
     # 打印前 15 个最快节点的预览
     for latency, speed_kbps, line in results[:15]:
         if speed_kbps >= 1024:
@@ -128,31 +127,31 @@ def main():
             speed_str = f"{speed_kbps:.1f} KB/s"
         else:
             speed_str = f"{latency}ms (仅延迟)"
-            
         print(f"{speed_str:<15} | {str(latency) + ' ms':<12} | {line}")
 
     if len(results) > 15:
         print(f"... 还有 {len(results) - 15} 个节点未展示")
 
+    # 2. 【核心修改】只截取最优的前 50 个节点
+    top_50_results = results[:50]
+
     # 保存结果到输出文件
     try:
         with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
-            for latency, speed_kbps, line in results:
+            for latency, speed_kbps, line in top_50_results:
                 if speed_kbps >= 1024:
                     speed_tag = f"{speed_kbps / 1024:.1f}MB/s"
                 elif speed_kbps > 0:
                     speed_tag = f"{speed_kbps:.0f}KB/s"
                 else:
                     speed_tag = f"{latency}ms"
-
+                    
                 if "#" in line:
                     new_line = f"{line} ({speed_tag})"
                 else:
                     new_line = f"{line}#{speed_tag}"
                 f.write(f"{new_line}\n")
-        print(f"\n所有可用节点已保存至: {OUTPUT_FILE}")
+                
+        print(f"\n已成功将最优的前 {len(top_50_results)} 个节点保存至: {OUTPUT_FILE}")
     except IOError as e:
         print(f"错误: 无法写入文件 {OUTPUT_FILE}！原因: {e}")
-
-if __name__ == "__main__":
-    main()
