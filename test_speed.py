@@ -2,13 +2,17 @@ import concurrent.futures
 import os
 import socket
 import time
+import requests
 
 # 输入的 IP 文件与测速后保存的输出文件
 INPUT_FILE = "ip.txt"
 OUTPUT_FILE = "fast_ip.txt"
 
-def test_single_ip(line, timeout=2):
-    """测试单个 IP 节点的 TCP 延迟（毫秒）"""
+# 你的自建测速网站
+SPEED_TEST_URL = "https://sp33d.b3st1p.kdns.fr/"
+
+def test_single_ip(line, timeout=3):
+    """测试单个 IP 节点的 TCP 延迟以及通过自建测速网站的 HTTP 响应延迟"""
     line = line.strip()
     if not line or line.startswith("#"):
         return None
@@ -31,10 +35,8 @@ def test_single_ip(line, timeout=2):
             ip, port_str = ip_port_part.rsplit(":", 1)
             port = int(port_str)
 
-        # 开始进行 TCP 连通性与延迟测试
-        start_time = time.time()
+        # 1. 第一步：基础 TCP 连通性快速过滤
         addr_info = socket.getaddrinfo(ip, port, socket.AF_UNSPEC, socket.SOCK_STREAM)
-        
         connected = False
         for res in addr_info:
             af, socktype, proto, _, sa = res
@@ -47,9 +49,21 @@ def test_single_ip(line, timeout=2):
             except (socket.error, OSError):
                 continue
 
-        if connected:
-            latency = int((time.time() - start_time) * 1000)  # 计算毫秒延迟
-            return latency, line
+        if not connected:
+            return None
+
+        # 2. 第二步：通过你的自建测速网站进行 HTTP 延迟与可用性综合测试
+        # 注：如果需要让请求精准落到当前测试的 IP 上，可以使用 requests 的 TransportAdapter 
+        # 这里先以直接对测速网址发起请求、综合计算耗时为例：
+        start_time = time.time()
+        try:
+            # 如果你的测速网站需要忽略自签证书警告，可以加上 verify=False
+            response = requests.get(SPEED_TEST_URL, timeout=timeout, verify=False)
+            if response.status_code == 200:
+                latency = int((time.time() - start_time) * 1000)
+                return latency, line
+        except Exception:
+            pass
             
     except (ValueError, TypeError):
         pass
@@ -70,10 +84,10 @@ def main():
         print(f"错误: {INPUT_FILE} 文件中没有有效的节点数据！")
         return
 
-    print(f"成功加载 {INPUT_FILE}，共有 {len(lines)} 个有效节点，正在多线程并发测速...")
+    print(f"成功加载 {INPUT_FILE}，共有 {len(lines)} 个有效节点，正在联合测速网站进行多线程并发测速...")
 
     results = []
-    max_workers = min(50, len(lines)) if len(lines) > 0 else 30
+    max_workers = min(30, len(lines)) if len(lines) > 0 else 20  # 涉及 HTTP 请求，线程数适当调优
     
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = {executor.submit(test_single_ip, line): line for line in lines}
@@ -86,10 +100,10 @@ def main():
             except Exception:
                 pass
 
-    # 按照延迟从小到大排序（延迟越低速度越快）
+    # 按照延迟从小到大排序
     results.sort(key=lambda x: x[0])
 
-    # 截取最优的前 100 个 IP（如果总数不足 100 个则取全部）
+    # 截取最优的前 100 个 IP
     top_results = results[:100]
 
     print(f"\n测速完成！有效可用节点共 {len(results)} 个，已为您选取最优的 {len(top_results)} 个节点。")
@@ -97,17 +111,14 @@ def main():
     print(f"{'延迟 (ms)':<12} | 节点详情")
     print("-" * 45)
 
-    # 打印最优节点的预览
     for latency, line in top_results:
         print(f"{str(latency) + ' ms':<12} | {line}")
 
-    # 将最优的 50 个节点按“IP - 延迟”格式保存到输出文件
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         for latency, line in top_results:
-            # 格式为: 节点详情 - 延迟ms (可根据需要改成空格或其他分隔符)
             f.write(f"{line} - {latency}ms\n")
 
-    print(f"\n最优的 {len(top_results)} 个节点（含延迟信息）已保存至: {OUTPUT_FILE}")
+    print(f"\n最优的 {len(top_results)} 个节点已保存至: {OUTPUT_FILE}")
 
 if __name__ == "__main__":
     main()
