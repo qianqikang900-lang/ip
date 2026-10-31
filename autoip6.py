@@ -16,9 +16,9 @@ urls = [
     'https://cf.junzhen.qzz.io/best_ips.txt',
     'https://raw.githubusercontent.com/love-ztm/cfip/refs/heads/main/ubest_ips.txt',
     'https://bestcf.pages.dev/tiancheng2/jp.txt',
-    'https://bestcf.pages.dev/lzj/all.txt'，
-    'https://bestcf.pages.dev/xinyitang3/ipv4.txt'，
-    'https://bestcf.pages.dev/uouin/all.txt'，
+    'https://bestcf.pages.dev/lzj/all.txt',
+    'https://bestcf.pages.dev/xinyitang3/ipv4.txt',
+    'https://bestcf.pages.dev/uouin/all.txt',
 
 ]
 #    'https://cf.090227.xyz', 
