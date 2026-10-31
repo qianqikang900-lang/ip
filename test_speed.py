@@ -119,7 +119,6 @@ def test_single_ip(line, timeout=3):
         # 2. 第二步：通过 curl 测速接口测试真实下载带宽 (Mbps)
         speed_mbps = measure_speed_with_curl(ip, port, timeout=3.0)
         
-        # 如果下载速度为 0 或无效，可选择直接过滤或保留（这里以通过测速、返回 (延迟, 速度, 完整文本) 为例）
         return tcp_latency, speed_mbps, line
             
     except (ValueError, TypeError):
@@ -144,7 +143,7 @@ def main():
     print(f"成功加载 {INPUT_FILE}，共有 {len(lines)} 个有效节点，正在使用 cfnb 标准测速接口进行多线程测速...")
 
     results = []
-    max_workers = min(20, len(lines)) if len(lines) > 0 else 10  # 涉及 curl 下载，并发适度控制
+    max_workers = min(20, len(lines)) if len(lines) > 0 else 10
     
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = {executor.submit(test_single_ip, line): line for line in lines}
@@ -164,19 +163,19 @@ def main():
     top_results = results[:100]
 
     print(f"\n测速完成！有效可用节点共 {len(results)} 个，已为您选取最优的 {len(top_results)} 个节点。")
-    print("-" * 60)
+    print("-" * 65)
     print(f"{'TCP延迟':<10} | {'下载速度':<12} | 节点详情")
-    print("-" * 60)
+    print("-" * 65)
 
     for latency, speed, line in top_results:
         print(f"{str(latency) + ' ms':<10} | {str(speed) + ' Mbps':<12} | {line}")
 
-    # 将结果保存到输出文件
+    # 将结果按“节点 - 延迟ms - 速度Mbps”的格式写入输出文件
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         for latency, speed, line in top_results:
             f.write(f"{line} - {latency}ms - {speed}Mbps\n")
 
-    print(f"\n最优的 {len(top_results)} 个节点已保存至: {OUTPUT_FILE}")
+    print(f"\n最优的 {len(top_results)} 个节点（含延迟与下载速度）已保存至: {OUTPUT_FILE}")
 
 if __name__ == "__main__":
     main()
