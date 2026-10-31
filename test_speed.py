@@ -24,7 +24,10 @@ def get_curl_command() -> str | None:
 def parse_curl_speed(stdout: str) -> float:
     """解析 curl 返回的下载速度 (Mbps)"""
     try:
-        size_text, time_text, *_ = stdout.strip().split()
+        parts = stdout.strip().split()
+        if len(parts) < 2:
+            return 0.0
+        size_text, time_text = parts[0], parts[1]
         size_bytes = float(size_text)
         time_total = float(time_text)
     except ValueError:
@@ -35,7 +38,7 @@ def parse_curl_speed(stdout: str) -> float:
     return round((size_bytes * 8) / (time_total * 1_000_000), 2)
 
 def measure_speed_with_curl(ip: str, port: int, timeout: float = 3.0) -> float:
-    """提取自 cfnb 仓库的 curl 下载测速接口"""
+    """使用 curl 对指定 IP 和端口进行真实下载测速"""
     curl = get_curl_command()
     if not curl:
         return 0.0
@@ -69,7 +72,7 @@ def measure_speed_with_curl(ip: str, port: int, timeout: float = 3.0) -> float:
 
 def test_single_ip(line, timeout=3):
     """
-    接入 cfnb 标准测速逻辑：
+    单节点综合测试：
     1. TCP 端口连通与延迟测试
     2. curl 真实下载带宽测速
     """
@@ -81,10 +84,8 @@ def test_single_ip(line, timeout=3):
         # 分离出 IP、端口和国家代码备注 (例如: 1.2.3.4:443#TH 或 [2001:db8::1]:443)
         if "#" in line:
             ip_port_part, country_tag = line.rsplit("#", 1)
-            country_tag = "#" + country_tag
         else:
             ip_port_part = line
-            country_tag = ""
 
         # 兼容 IPv6 方括号与 IPv4 端口解析
         if ip_port_part.startswith("["):
@@ -95,21 +96,31 @@ def test_single_ip(line, timeout=3):
             ip, port_str = ip_port_part.rsplit(":", 1)
             port = int(port_str)
 
-        # 1. 第一步：TCP 连通性与延迟测试 (cfnb 标准实现)
+        # 1. 第一步：TCP 连通性与延迟测试
         start_time = time.perf_counter()
-        addr_info = socket.getaddrinfo(ip, port, socket.AF_UNSPEC, socket.SOCK_STREAM)
         
+        # 优化：通过 socket 直接连接，避免不必要的 getaddrinfo 阻塞
         connected = False
-        for res in addr_info:
-            af, socktype, proto, _, sa = res
+        addr_family = socket.AF_INET6 if ":" in ip else socket.AF_INET
+        
+        try:
+            with socket.socket(addr_family, socket.SOCK_STREAM) as s:
+                s.settimeout(timeout)
+                s.connect((ip, port))
+                connected = True
+        except (socket.error, OSError):
+            # 如果直连失败，尝试用 getaddrinfo 兼容多协议
             try:
-                with socket.socket(af, socktype, proto) as s:
-                    s.settimeout(timeout)
-                    s.connect(sa)
-                    connected = True
-                    break
+                addr_info = socket.getaddrinfo(ip, port, socket.AF_UNSPEC, socket.SOCK_STREAM)
+                for res in addr_info:
+                    af, socktype, proto, _, sa = res
+                    with socket.socket(af, socktype, proto) as s:
+                        s.settimeout(timeout)
+                        s.connect(sa)
+                        connected = True
+                        break
             except (socket.error, OSError):
-                continue
+                pass
 
         if not connected:
             return None
