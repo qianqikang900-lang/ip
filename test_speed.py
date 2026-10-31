@@ -1,18 +1,78 @@
 import concurrent.futures
 import os
+import shutil
 import socket
+import subprocess
+import sys
 import time
-import requests
 
 # 输入的 IP 文件与测速后保存的输出文件
 INPUT_FILE = "ip.txt"
 OUTPUT_FILE = "fast_ip.txt"
 
-# 你的自建测速网站
-SPEED_TEST_URL = "https://sp33d.b3st1p.kdns.fr/"
+# 接入 cfnb 标准测速域名和测速包大小
+SPEED_DOMAIN = "speed.cloudflare.com"
+SPEED_PATH = "/__down"
+SPEED_BYTES = 2 * 1024 * 1024  # 2MB 测速包
+
+def get_curl_command() -> str | None:
+    """获取系统可用的 curl 命令路径"""
+    if sys.platform == "win32":
+        return shutil.which("curl.exe") or shutil.which("curl")
+    return shutil.which("curl")
+
+def parse_curl_speed(stdout: str) -> float:
+    """解析 curl 返回的下载速度 (Mbps)"""
+    try:
+        size_text, time_text, *_ = stdout.strip().split()
+        size_bytes = float(size_text)
+        time_total = float(time_text)
+    except ValueError:
+        return 0.0
+
+    if size_bytes <= 0 or time_total <= 0:
+        return 0.0
+    return round((size_bytes * 8) / (time_total * 1_000_000), 2)
+
+def measure_speed_with_curl(ip: str, port: int, timeout: float = 3.0) -> float:
+    """提取自 cfnb 仓库的 curl 下载测速接口"""
+    curl = get_curl_command()
+    if not curl:
+        return 0.0
+
+    url = f"https://{SPEED_DOMAIN}:{port}{SPEED_PATH}?bytes={SPEED_BYTES}"
+    cmd = [
+        curl,
+        "-s",
+        "-o", "NUL" if sys.platform == "win32" else "/dev/null",
+        "-w", "%{size_download} %{time_total}",
+        "--resolve", f"{SPEED_DOMAIN}:{port}:{ip}",
+        "--connect-timeout", str(min(3.0, timeout)),
+        "--max-time", str(timeout),
+        "--insecure",
+        url,
+    ]
+    
+    try:
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=timeout + 2,
+            creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return parse_curl_speed(result.stdout)
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    return 0.0
 
 def test_single_ip(line, timeout=3):
-    """测试单个 IP 节点的 TCP 延迟以及通过自建测速网站的 HTTP 响应延迟"""
+    """
+    接入 cfnb 标准测速逻辑：
+    1. TCP 端口连通与延迟测试
+    2. curl 真实下载带宽测速
+    """
     line = line.strip()
     if not line or line.startswith("#"):
         return None
@@ -35,8 +95,10 @@ def test_single_ip(line, timeout=3):
             ip, port_str = ip_port_part.rsplit(":", 1)
             port = int(port_str)
 
-        # 1. 第一步：基础 TCP 连通性快速过滤
+        # 1. 第一步：TCP 连通性与延迟测试 (cfnb 标准实现)
+        start_time = time.perf_counter()
         addr_info = socket.getaddrinfo(ip, port, socket.AF_UNSPEC, socket.SOCK_STREAM)
+        
         connected = False
         for res in addr_info:
             af, socktype, proto, _, sa = res
@@ -52,18 +114,13 @@ def test_single_ip(line, timeout=3):
         if not connected:
             return None
 
-        # 2. 第二步：通过你的自建测速网站进行 HTTP 延迟与可用性综合测试
-        # 注：如果需要让请求精准落到当前测试的 IP 上，可以使用 requests 的 TransportAdapter 
-        # 这里先以直接对测速网址发起请求、综合计算耗时为例：
-        start_time = time.time()
-        try:
-            # 如果你的测速网站需要忽略自签证书警告，可以加上 verify=False
-            response = requests.get(SPEED_TEST_URL, timeout=timeout, verify=False)
-            if response.status_code == 200:
-                latency = int((time.time() - start_time) * 1000)
-                return latency, line
-        except Exception:
-            pass
+        tcp_latency = int((time.perf_counter() - start_time) * 1000)
+
+        # 2. 第二步：通过 curl 测速接口测试真实下载带宽 (Mbps)
+        speed_mbps = measure_speed_with_curl(ip, port, timeout=3.0)
+        
+        # 如果下载速度为 0 或无效，可选择直接过滤或保留（这里以通过测速、返回 (延迟, 速度, 完整文本) 为例）
+        return tcp_latency, speed_mbps, line
             
     except (ValueError, TypeError):
         pass
@@ -84,10 +141,10 @@ def main():
         print(f"错误: {INPUT_FILE} 文件中没有有效的节点数据！")
         return
 
-    print(f"成功加载 {INPUT_FILE}，共有 {len(lines)} 个有效节点，正在联合测速网站进行多线程并发测速...")
+    print(f"成功加载 {INPUT_FILE}，共有 {len(lines)} 个有效节点，正在使用 cfnb 标准测速接口进行多线程测速...")
 
     results = []
-    max_workers = min(30, len(lines)) if len(lines) > 0 else 20  # 涉及 HTTP 请求，线程数适当调优
+    max_workers = min(20, len(lines)) if len(lines) > 0 else 10  # 涉及 curl 下载，并发适度控制
     
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = {executor.submit(test_single_ip, line): line for line in lines}
@@ -96,27 +153,28 @@ def main():
             try:
                 res = future.result()
                 if res:
-                    results.append(res)
+                    results.append(res)  # 结构: (latency, speed_mbps, line)
             except Exception:
                 pass
 
-    # 按照延迟从小到大排序
-    results.sort(key=lambda x: x[0])
+    # 优先按照下载速度从大到小排序，其次按 TCP 延迟从小到大排序
+    results.sort(key=lambda x: (-x[1], x[0]))
 
-    # 截取最优的前 100 个 IP
+    # 截取最优的前 100 个节点
     top_results = results[:100]
 
     print(f"\n测速完成！有效可用节点共 {len(results)} 个，已为您选取最优的 {len(top_results)} 个节点。")
-    print("-" * 45)
-    print(f"{'延迟 (ms)':<12} | 节点详情")
-    print("-" * 45)
+    print("-" * 60)
+    print(f"{'TCP延迟':<10} | {'下载速度':<12} | 节点详情")
+    print("-" * 60)
 
-    for latency, line in top_results:
-        print(f"{str(latency) + ' ms':<12} | {line}")
+    for latency, speed, line in top_results:
+        print(f"{str(latency) + ' ms':<10} | {str(speed) + ' Mbps':<12} | {line}")
 
+    # 将结果保存到输出文件
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
-        for latency, line in top_results:
-            f.write(f"{line} - {latency}ms\n")
+        for latency, speed, line in top_results:
+            f.write(f"{line} - {latency}ms - {speed}Mbps\n")
 
     print(f"\n最优的 {len(top_results)} 个节点已保存至: {OUTPUT_FILE}")
 
